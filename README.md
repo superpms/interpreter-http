@@ -1,4 +1,4 @@
-pms framework interpreter terminal
+pms framework http interpreter
 ===============
 pms 框架 http 应用解释器
 
