@@ -1,13 +1,10 @@
 {
     "name": "superpms/interpreter-http",
     "description": "pms http interpreter",
-    "version": "1.0.0",
     "license": "Apache-2.0",
     "autoload": {
         "files": [
-            "stubs/autorun.php",
-            "stubs/const.php",
-            "stubs/ide-helper.php"
+            "bin/autoload.php"
         ],
         "psr-4": {
             "pms\\": "src/pms/"
@@ -21,8 +18,9 @@
     ],
     "require": {
         "php": ">=8.1",
-        "superpms/framework": "^2.0.0",
-        "superpms/interpreter-terminal": "^1.0.0"
+        "superpms/framework": "^2.0.0"
     },
-    "require-dev": {}
+    "require-dev": {
+        "superpms/interpreter-terminal": "^1.0.0"
+    }
 }

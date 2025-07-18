@@ -1,16 +1,15 @@
 <?php
 
-namespace pms\source\InterpreterHttp\command;
+namespace pms\program\http;
 
 use pms\annotate\Inject;
 use pms\app\TerminalCommandApp;
 use pms\inject\TerminalInputInject;
 use pms\inject\TerminalOutputInject;
-use pms\facade\Path;
 
 class DevHttpServerCommand extends TerminalCommandApp{
     protected string $name = "PHP Built-in Server";
-    protected string $description = "插件安装";
+    protected string $description = "运行PHP内置服务器";
     protected array $validate = [
         'host'=>[
             'type'=>COMMAND_OPTION_TYPE,
@@ -39,7 +38,7 @@ class DevHttpServerCommand extends TerminalCommandApp{
         $port = $this->input->getOption('port');
         $root = $this->input->getOption('root');
         if (empty($root)) {
-            $root = Path::getPublic();
+            $root = config('http.web_path','public');
         }
         $command = sprintf(
             '%s -S %s:%d -t %s %s',

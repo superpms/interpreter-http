@@ -1,17 +1,18 @@
 <?php
 
-namespace pms;
+namespace pms\interpreter\http;
 use pms\app\InterpreterApp;
-use pms\interpreter\http\Sandbox;
+use pms\facade\Path;
 use pms\interpreter\http\sandbox\HttpRequest;
 use pms\interpreter\http\sandbox\HttpResponse;
 
-class HttpInterpreter extends InterpreterApp{
+class Interpreter extends InterpreterApp{
 
     protected static string $name = 'http-web server';
 
     public static function run(): mixed
     {
+        Path::mount('WebRoot', Path::getRoot(config('http.web_root','/public')));
         $request = new HttpRequest();
         $response = new HttpResponse();
         self::customShutDownHandler($response);

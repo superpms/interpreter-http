@@ -14,13 +14,8 @@ use pms\exception\ClassNotFoundException;
 use pms\exception\CliModeForcedInterruptException;
 
 use pms\facade\Path;
-use pms\helper\Data;
 use ReflectionClass;
 
-use Symfony\Component\VarDumper\Caster\ReflectionCaster;
-use Symfony\Component\VarDumper\Cloner\VarCloner;
-use Symfony\Component\VarDumper\Dumper\HtmlDumper;
-use Symfony\Component\VarDumper\VarDumper as dumper;
 
 class Sandbox extends Container
 {
@@ -47,7 +42,7 @@ class Sandbox extends Container
                 return;
             }
 
-            set_error_handler('customErrorHandler');
+            set_error_handler('HttpCustomErrorHandler');
 
             if (!$this->inHttpApp()) {
                 $this->sendFile($this->request->pathinfo());
@@ -74,6 +69,7 @@ class Sandbox extends Container
 
     protected function inHttpApp(): bool
     {
+
         $pathinfo = $this->request->pathinfo();
         $apps = config('http.apps',[]);
         if (is_string($apps)) {
@@ -88,6 +84,7 @@ class Sandbox extends Container
                 break;
             }
         }
+
         return $inApp;
     }
 
@@ -100,7 +97,7 @@ class Sandbox extends Container
 
     protected function sendFile(string $pathinfo): void
     {
-        $filePath = Path::getPublic($pathinfo);
+        $filePath = Path::getWebRoot($pathinfo);
         if (is_file($filePath)) {
             try{
                 $this->response->header('Content-Type', mime_content_type($filePath));
@@ -211,7 +208,7 @@ class Sandbox extends Container
         return match ($contentType) {
             JSON_CONTENT_TYPE => json_encode($data, 320),
             JSONP_CONTENT_TYPE => $this->request->get('callback', 'callback') . '(' . json_encode($data) . ')',
-            XML_CONTENT_TYPE => Data::arrayToXml($data),
+            XML_CONTENT_TYPE => array_to_xml($data),
             default => is_array($data) || is_object($data) ? json_encode($data, 320) : $data,
         };
     }
@@ -238,7 +235,7 @@ class Sandbox extends Container
          */
         $data = $obj->entry();
         if ($data === null) {
-            $data = $class->getProperty('responseData')->getValue($obj);
+            $data = $class->getProperty('responseRaw')->getValue($obj);
         }
         if ($callback !== null) {
             $callback($class, $obj);
@@ -263,7 +260,7 @@ class Sandbox extends Container
             '',
             'app',
             ...array_slice($pathinfo, 0, 1),
-            'http',
+            config('interpreter_name','http'),
             $packageName,
             ...array_slice($pathinfo, 1, count($pathinfo) - 2),
             ucfirst($pathinfo[count($pathinfo) - 1])
@@ -280,7 +277,7 @@ class Sandbox extends Container
     protected function exceptionHandle(\Throwable $e, bool $inUser = true): void{
         try {
             if (!($e instanceof CliModeForcedInterruptException)) {
-                $userHandle = "\\app\\$this->app\\HttpExceptionHandle";
+                $userHandle = "\\app\\".config('interpreter_name','http')."\\$this->app\\HttpExceptionHandle";
                 $systemHandle = "\\pms\\HttpExceptionHandle";
                 $handle = $systemHandle;
                 if ($inUser && class_exists($userHandle)) {
