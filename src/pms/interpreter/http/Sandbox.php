@@ -235,7 +235,7 @@ class Sandbox extends Container
          */
         $data = $obj->entry();
         if ($data === null) {
-            $data = $class->getProperty('responseRaw')->getValue($obj);
+            $data = $class->getProperty('resRaw')->getValue($obj);
         }
         if ($callback !== null) {
             $callback($class, $obj);

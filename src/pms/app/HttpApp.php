@@ -33,7 +33,7 @@ abstract class HttpApp implements AppInterface
      * 响应数据载体
      * @var mixed|null
      */
-    protected mixed $responseData = null;
+    protected mixed $resRaw = null;
 
     /**
      * @var string 当前应用名称
