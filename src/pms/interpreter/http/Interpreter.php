@@ -10,7 +10,7 @@ class Interpreter extends InterpreterApp{
 
     protected static string $name = 'http-web server';
 
-    public static function run(): mixed
+    public static function run(\pms\program\boot\Options $bootOptions): bool
     {
         Path::mount('WebRoot', Path::getRoot(config('http.web_root','/public')));
         $request = new HttpRequest();

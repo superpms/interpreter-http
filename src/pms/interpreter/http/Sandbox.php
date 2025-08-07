@@ -32,21 +32,21 @@ class Sandbox extends Container
         $this->response = $response;
     }
 
-    public function run(): void
+    public function run(): bool
     {
         try {
             $this->initCors();
 
             if ($this->request->isOptions()) {
                 $this->response->end();
-                return;
+                return true;
             }
 
             set_error_handler('HttpCustomErrorHandler');
 
             if (!$this->inHttpApp()) {
                 $this->sendFile($this->request->pathinfo());
-                return;
+                return true;
             }
 
             $this->request->init();
@@ -61,9 +61,11 @@ class Sandbox extends Container
                 $this->response->header('Content-Type', $this->contentType);
                 $this->response->end($data);
             }
+            return true;
         } catch (\Throwable $e) {
             $this->response->header('Content-Type', $this->contentType);
             $this->exceptionHandle($e);
+            return false;
         }
     }
 
