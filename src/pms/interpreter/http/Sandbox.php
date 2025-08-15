@@ -5,6 +5,7 @@ namespace pms\interpreter\http;
 use pms\contract\AppInterface;
 use pms\app\HttpMiddlewareApp;
 use pms\Container;
+use pms\facade\Config;
 use pms\HttpExceptionHandle;
 use pms\inject\HttpRequestInject;
 use pms\inject\HttpResponseInject;
@@ -25,6 +26,8 @@ class Sandbox extends Container
     protected string $contentType = JSON_CONTENT_TYPE;
 
     protected string $app = '';
+    protected string $terminal = '';
+    protected string $interface = '';
 
     public function __construct(HttpRequestInject $request, HttpResponseInject $response)
     {
@@ -41,26 +44,29 @@ class Sandbox extends Container
                 $this->response->end();
                 return true;
             }
-
             set_error_handler('HttpCustomErrorHandler');
 
-            if (!$this->inHttpApp()) {
+
+            $this->analysisPathInfo();
+
+            if (!$this->inApp()) {
                 $this->sendFile($this->request->pathinfo());
                 return true;
             }
 
             $this->request->init();
             $this->putInject();
-
-            $data = $this->execute($this->getRealPathInfo(), function (ReflectionClass $class, AppInterface $obj) {
+            $data = $this->execute(function (ReflectionClass $class, AppInterface $obj) {
                 $contentType = $class->getProperty('contentType');
                 $this->contentType = $contentType->getValue($obj);
             });
+
             if ($this->response->isWritable()) {
                 $data = $this->contentToString($data, $this->contentType);
                 $this->response->header('Content-Type', $this->contentType);
                 $this->response->end($data);
             }
+
             return true;
         } catch (\Throwable $e) {
             $this->response->header('Content-Type', $this->contentType);
@@ -69,25 +75,47 @@ class Sandbox extends Container
         }
     }
 
-    protected function inHttpApp(): bool
-    {
 
+    protected function analysisPathInfo(){
         $pathinfo = $this->request->pathinfo();
+        $arr = explode("/",$pathinfo);
+        $this->app = config('http.default.app', 'index');
+        $this->terminal = config('http.default.terminal', 'index');
+        $this->interface = config('http.default.interface', 'Index');
+
+        foreach ($arr as $key => $value){
+            if ($value == '' || $value == '.' || $value == '..') {
+                unset($arr[$key]);
+            }
+        }
+        $arr = array_values($arr);
+        switch (count($arr)){
+            case 0:
+                break;
+            case 1:
+                $this->app = $arr[0];
+                break;
+            case 2:
+                $this->app = $arr[0];
+                $this->terminal = $arr[1];
+                break;
+            default:
+                $this->app = $arr[0];
+                $this->terminal = $arr[1];
+                $this->interface = join("\\",array_slice($arr, 2));
+                break;
+        }
+
+    }
+
+
+
+    protected function inApp(): bool{
         $apps = config('http.apps',[]);
         if (is_string($apps)) {
             $apps = [$apps];
         }
-
-        $inApp = false;
-        foreach ($apps as $app) {
-            if (str_starts_with($pathinfo, '/' . $app)) {
-                $inApp = true;
-                $this->app = $app;
-                break;
-            }
-        }
-
-        return $inApp;
+        return in_array($this->app, $apps);
     }
 
     protected function initCors(): void{
@@ -120,38 +148,65 @@ class Sandbox extends Container
         $this->put(HttpResponseInject::class, $this->response);
     }
 
-    protected function getRealPathInfo(): string
-    {
-        $pathinfo = $this->request->pathinfo();
-        $defaultPath = [
-            '/' . $this->app,
-            '/' . $this->app . "/",
-        ];
-        if (in_array($pathinfo, $defaultPath)) {
-            $defaultController = config('http.default_controller', 'Index');
-            $pathinfo = '/' . $this->app . '/' . $defaultController;
+
+    protected function initInterpreterConfig(): void{
+        $interpreterName = config('http.structure_name.interpreter', 'http');
+        $configName = config('http.structure_name.config', 'config');
+
+        $files = [];
+
+        $interpreterPath = Path::getConfig(
+            'interpreter',
+            $interpreterName
+        );
+
+        if(is_dir($interpreterPath)){
+            $files = [
+                ...$files,
+                ...glob($interpreterPath . '/*' . '.php')
+            ];
         }
-        return $pathinfo;
-    }
-
-
-    protected function initMiddlewareConfig(): void{
-        $config = [];
-        $middlewarePath = Path::getApp($this->app . "/http/middleware.php");
-        if (file_exists($middlewarePath)) {
-            $middleware = include $middlewarePath;
-            if (is_array($middleware)) {
-                $config = $middleware;
+        if (is_dev()){
+            $devConfigPath = path_join($interpreterPath, "dev");
+            if (is_dir($devConfigPath)) {
+                $files = array_merge($files, glob($devConfigPath . '/*.php'));
             }
         }
-        $this->middlewares = [
-            ...$this->middlewares,
-            ...$config,
-        ];
+
+        $appPath = Path::getApp(
+            $this->app,
+            $interpreterName,
+            $this->terminal,
+            $configName
+        );
+        if(is_dir($appPath)){
+            $files = [
+                ...$files,
+                ...glob($appPath . '/*' . '.php')
+            ];
+        }
+        if (is_dev()){
+            $appDevConfigPath = path_join($appPath, "dev");
+            if (is_dir($appDevConfigPath)) {
+                $files = [
+                    ...$files,
+                    ...glob($appDevConfigPath . '/*.php')
+                ];
+            }
+        }
+        $configList = load_file_config($files);
+        foreach ($configList as $key => $value){
+            Config::mount($key, $value);
+        }
+
     }
 
-    protected function middleware(string $classNamespace, \Closure $callback = null): ReflectionClass
+    protected function middleware(string $classNamespace): ReflectionClass
     {
+        $this->middlewares = array_unique([
+            ...$this->middlewares,
+            ...config('middleware',[]),
+        ]);
         try {
             $actionClass = $this->getClass($classNamespace);
         } catch (\Throwable $e) {
@@ -215,16 +270,16 @@ class Sandbox extends Container
         };
     }
 
-    protected function execute(string $pathinfo, \Closure $callback = null)
+    protected function execute(\Closure $callback = null)
     {
-        $namespace = $this->pathinfoToNamespace($pathinfo);
-
+        $namespace = $this->getInterfaceNamespace();
         if (!class_exists($namespace)) {
             throw new ClassNotFoundException($namespace);
         }
-        $this->initMiddlewareConfig();
+        $this->initInterpreterConfig();
 
-        $class = $this->middleware($namespace, $callback);
+
+        $class = $this->middleware($namespace);
         $obj = $this->invokeClass($class);
         $obj->app = $this->app;
 
@@ -249,25 +304,19 @@ class Sandbox extends Container
         return $data;
     }
 
-    protected function pathinfoToNamespace(string $pathinfo): string
+    protected function getInterfaceNamespace(): string
     {
-        $packageName = config('http.package_name', 'package');
-
-        $pathinfo = str_replace(".", "\\", $pathinfo);
-        $pathinfo = str_replace("//", "\\", $pathinfo);
-        $pathinfo = str_replace("/", "\\", $pathinfo);
-        $pathinfo = trim($pathinfo, "\\");
-        $pathinfo = explode("\\", $pathinfo);
-        $pathinfo = join("\\", [
+        $interpreterName = config('http.structure_name.interpreter', 'http');
+        $packageName = config('http.structure_name.package', 'package');
+        return join("\\", [
             '',
             'app',
-            ...array_slice($pathinfo, 0, 1),
-            config('interpreter_name','http'),
+            $this->app,
+            $interpreterName,
+            $this->terminal,
             $packageName,
-            ...array_slice($pathinfo, 1, count($pathinfo) - 2),
-            ucfirst($pathinfo[count($pathinfo) - 1])
+            $this->interface
         ]);
-        return $pathinfo;
     }
 
     /**
@@ -278,12 +327,22 @@ class Sandbox extends Container
      */
     protected function exceptionHandle(\Throwable $e, bool $inUser = true): void{
         try {
+
             if (!($e instanceof CliModeForcedInterruptException)) {
-                $userHandle = "\\app\\".config('interpreter_name','http')."\\$this->app\\HttpExceptionHandle";
-                $systemHandle = "\\pms\\HttpExceptionHandle";
-                $handle = $systemHandle;
-                if ($inUser && class_exists($userHandle)) {
-                    $handle = $userHandle;
+                $interpreterName = config('http.structure_name.interpreter', 'http');
+
+                $customizedHandle = join("\\",[
+                    "",
+                    "app",
+                    $this->app,
+                    $interpreterName,
+                    $this->terminal,
+                    'HttpExceptionHandle',
+                ]);
+
+                $handle = "\\pms\\HttpExceptionHandle";
+                if ($inUser && class_exists($customizedHandle)) {
+                    $handle = $customizedHandle;
                 }
                 $class = $this->getClass($handle);
                 /**

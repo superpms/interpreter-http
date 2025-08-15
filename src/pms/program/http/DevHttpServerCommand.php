@@ -38,7 +38,7 @@ class DevHttpServerCommand extends TerminalCommandApp{
         $port = $this->input->getOption('port');
         $root = $this->input->getOption('root');
         if (empty($root)) {
-            $root = config('http.web_path','public');
+            $root = config('http.structure_name.web_root','public');
         }
         $command = sprintf(
             '%s -S %s:%d -t %s %s',
@@ -52,7 +52,7 @@ class DevHttpServerCommand extends TerminalCommandApp{
             $this->output->setBoldStr($this->output->setColorStr(TERMINAL_COLOR_GREEN,"● PHP 内置服务器(仅用于开发测试)")),
             '服务IP: '.$host,
             '服务端口: '.$port,
-            sprintf('服务根目录: %s', $root),
+            sprintf('服务根目录: /%s', $root),
             sprintf('服务地址: <http://%s:%s/>', $host, $port),
             sprintf('本机访问地址: <http://127.0.0.1:%s/>', $port),
             "\033[31m使用\033[1m`CTRL-C`\033[22m即可退出服务\033[0m",

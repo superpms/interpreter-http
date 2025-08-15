@@ -12,7 +12,7 @@ class Interpreter extends InterpreterApp{
 
     public static function run(\pms\program\boot\Options $bootOptions): bool
     {
-        Path::mount('WebRoot', Path::getRoot(config('http.web_root','/public')));
+        Path::mount('WebRoot', Path::getRoot(config('http.structure_name.web_root','public')));
         $request = new HttpRequest();
         $response = new HttpResponse();
         self::customShutDownHandler($response);
