@@ -201,32 +201,43 @@ class Sandbox extends Container
 
     }
 
-    protected function middleware(string $classNamespace): ReflectionClass
+    protected function getInterfaceClass(string $classNamespace): ReflectionClass
     {
-        $this->middlewares = array_unique([
-            ...$this->middlewares,
-            ...config('middleware',[]),
-        ]);
         try {
             $actionClass = $this->getClass($classNamespace);
         } catch (\Throwable $e) {
             throw new ClassNotFoundException($classNamespace, $e);
         }
-        $this->contentType = $actionClass->getProperty('contentType')->getDefaultValue();
+        return $actionClass;
+    }
+
+    protected function initInterface(ReflectionClass $interfaceClass): void
+    {
+        $this->contentType = $interfaceClass->getProperty('contentType')->getDefaultValue();
+
+    }
+
+    protected function middleware(ReflectionClass $interfaceClass): void
+    {
+        $this->middlewares = array_unique([
+            ...$this->middlewares,
+            ...config('middleware',[]),
+        ]);
+
         // 执行应用全局中间件
         $this->runMiddleware($this->middlewares, [
-            $actionClass,
+            $interfaceClass,
             $this->request,
             $this->app
         ]);
-        // 执行应用独立中间件
-        $actionMiddlewares = $actionClass->getProperty('middleware')->getDefaultValue();
+
+        // 执行接口独立中间件
+        $actionMiddlewares = $interfaceClass->getProperty('middleware')->getDefaultValue();
         $this->runMiddleware($actionMiddlewares, [
-            $actionClass,
+            $interfaceClass,
             $this->request,
             $this->app
         ]);
-        return $actionClass;
     }
 
     /**
@@ -278,8 +289,11 @@ class Sandbox extends Container
         }
         $this->initInterpreterConfig();
 
+        $class = $this->getInterfaceClass($namespace);
+        $this->initInterface($class);
 
-        $class = $this->middleware($namespace);
+        $this->middleware($class);
+
         $obj = $this->invokeClass($class);
         $obj->app = $this->app;
 
