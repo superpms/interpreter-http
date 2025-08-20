@@ -15,16 +15,6 @@ abstract class HttpApp implements AppInterface
     protected string $contentType = JSON_CONTENT_TYPE;
 
     /**
-     * @var string 接口描述
-     */
-    protected string $desc = "";
-
-    /**
-     * @var string 接口描述
-     */
-    protected string $comment = '';
-
-    /**
      * @var array|string 接口中间件
      */
     protected array|string $middleware = [];
@@ -41,14 +31,10 @@ abstract class HttpApp implements AppInterface
     public string $app;
 
     /**
-     * 动态接口参数验证规则-方法
-     * @param HttpRequestInject|null $request
-     * @return array
+     * @var string 当前终端名称
      */
-    protected static function validate(HttpRequestInject|null $request = null): array
-    {
-        return [];
-    }
+    public string $terminal;
+
 
     /**
      * entry的前置执行方法，且在当前接口实例化完成之后

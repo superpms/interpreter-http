@@ -2,6 +2,7 @@
 
 namespace pms\interpreter\http;
 
+use pms\app\HttpApp;
 use pms\contract\AppInterface;
 use pms\app\HttpMiddlewareApp;
 use pms\Container;
@@ -291,8 +292,12 @@ class Sandbox extends Container
 
         $this->middleware($class);
 
+        /**
+         * @var $obj HttpApp
+         */
         $obj = $this->invokeClass($class);
         $obj->app = $this->app;
+        $obj->ter = $this->app;
 
         if(method_exists($obj,'__prepare')) {
             $obj->__prepare();
