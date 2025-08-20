@@ -221,23 +221,20 @@ class Sandbox extends Container
     {
         $this->middlewares = array_unique([
             ...$this->middlewares,
+            // 执行应用全局中间件
             ...config('middleware',[]),
+            // 执行接口独立中间件
+            ...$interfaceClass->getProperty('middleware')->getDefaultValue(),
         ]);
 
-        // 执行应用全局中间件
         $this->runMiddleware($this->middlewares, [
             $interfaceClass,
             $this->request,
-            $this->app
+            $this->app,
+            $this->terminal,
+            $this->interface,
         ]);
 
-        // 执行接口独立中间件
-        $actionMiddlewares = $interfaceClass->getProperty('middleware')->getDefaultValue();
-        $this->runMiddleware($actionMiddlewares, [
-            $interfaceClass,
-            $this->request,
-            $this->app
-        ]);
     }
 
     /**
