@@ -297,7 +297,7 @@ class Sandbox extends Container
          */
         $obj = $this->invokeClass($class);
         $obj->app = $this->app;
-        $obj->ter = $this->app;
+        $obj->terminal = $this->terminal;
 
         if(method_exists($obj,'__prepare')) {
             $obj->__prepare();
