@@ -16,6 +16,7 @@ use pms\exception\ClassNotFoundException;
 use pms\exception\CliModeForcedInterruptException;
 
 use pms\facade\Path;
+use pms\program\boot\Options;
 use ReflectionClass;
 
 
@@ -23,6 +24,7 @@ class Sandbox extends Container
 {
     protected HttpRequestInject $request;
     protected HttpResponseInject $response;
+    protected Options $bootOptions;
     protected array $middlewares = [];
     protected string $contentType = JSON_CONTENT_TYPE;
 
@@ -30,10 +32,10 @@ class Sandbox extends Container
     protected string $terminal = '';
     protected string $interface = '';
 
-    public function __construct(HttpRequestInject $request, HttpResponseInject $response)
-    {
+    public function __construct(HttpRequestInject $request, HttpResponseInject $response,Options $bootOptions){
         $this->request = $request;
         $this->response = $response;
+        $this->bootOptions = $bootOptions;
     }
 
     public function run(): bool
@@ -234,6 +236,7 @@ class Sandbox extends Container
             $this->app,
             $this->terminal,
             $this->interface,
+            $this->bootOptions
         ]);
 
     }
@@ -298,6 +301,7 @@ class Sandbox extends Container
         $obj = $this->invokeClass($class);
         $obj->app = $this->app;
         $obj->terminal = $this->terminal;
+        $obj->bootOptions = $this->bootOptions;
 
         if(method_exists($obj,'__prepare')) {
             $obj->__prepare();

@@ -5,6 +5,7 @@ namespace pms\app;
 
 use pms\contract\AppInterface;
 use pms\inject\HttpRequestInject;
+use pms\program\boot\Options;
 
 abstract class HttpApp implements AppInterface
 {
@@ -34,6 +35,10 @@ abstract class HttpApp implements AppInterface
      * @var string 当前终端名称
      */
     public string $terminal;
+    /**
+     * @var Options 当前启动配置
+     */
+    public Options $bootOptions;
 
 
     /**

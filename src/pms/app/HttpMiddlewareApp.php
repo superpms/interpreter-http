@@ -4,6 +4,7 @@ namespace pms\app;
 
 use pms\contract\AppInterface;
 use pms\inject\HttpRequestInject;
+use pms\program\boot\Options;
 use ReflectionClass;
 
 abstract class HttpMiddlewareApp implements AppInterface
@@ -15,7 +16,8 @@ abstract class HttpMiddlewareApp implements AppInterface
         protected HttpRequestInject $request,
         protected string $app,
         protected string $terminal,
-        protected string $interface
+        protected string $interface,
+        protected Options $bootOptions,
     )
     {
     }

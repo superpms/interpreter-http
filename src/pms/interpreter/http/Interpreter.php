@@ -16,7 +16,7 @@ class Interpreter extends InterpreterApp{
         $request = new HttpRequest();
         $response = new HttpResponse();
         self::customShutDownHandler($response);
-        return (new Sandbox($request,$response))->run();
+        return (new Sandbox($request,$response,$bootOptions))->run();
     }
 
     public static function customShutDownHandler($response): void{
