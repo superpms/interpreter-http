@@ -7,6 +7,7 @@ use pms\contract\AppInterface;
 use pms\app\HttpMiddlewareApp;
 use pms\Container;
 use pms\facade\Config;
+use pms\facade\HttpRouter;
 use pms\HttpExceptionHandle;
 use pms\inject\HttpRequestInject;
 use pms\inject\HttpResponseInject;
@@ -31,6 +32,7 @@ class Sandbox extends Container
     protected string $app = '';
     protected string $terminal = '';
     protected string $interface = '';
+    protected string $pathinfo = '';
 
     public function __construct(HttpRequestInject $request, HttpResponseInject $response,Options $bootOptions){
         $this->request = $request;
@@ -49,10 +51,15 @@ class Sandbox extends Container
             }
             set_error_handler('HttpCustomErrorHandler');
 
+            $this->pathinfo = $this->request->pathinfo();
 
             $this->analysisPathInfo();
 
             if (!$this->inApp()) {
+                $this->sendFile($this->request->pathinfo());
+                return true;
+            }
+            if (!$this->inTerminal()) {
                 $this->sendFile($this->request->pathinfo());
                 return true;
             }
@@ -80,7 +87,7 @@ class Sandbox extends Container
 
 
     protected function analysisPathInfo(){
-        $pathinfo = $this->request->pathinfo();
+        $pathinfo = $this->pathinfo;
         $arr = explode("/",$pathinfo);
         $this->app = config('http.default.app', 'index');
         $this->terminal = config('http.default.terminal', 'index');
@@ -118,12 +125,31 @@ class Sandbox extends Container
         if (is_string($apps)) {
             $apps = [$apps];
         }
-        return in_array($this->app, $apps);
+        $realApp = [];
+        foreach ($apps as $key => $value){
+            if(is_string($key)){
+                $realApp[] = $key;
+            }else if(is_string($value)){
+                $realApp[] = $value;
+            }
+        }
+        return in_array($this->app, $realApp);
     }
+
+
+    protected function inTerminal(): bool{
+        $exclude = config('http.exclude_terminal',[]);
+        $current = $this->app . '.' .$this->terminal;
+        return !in_array($current, $exclude);
+    }
+
 
     protected function initCors(): void{
         $responseHeader = config('http.cors', []);
         foreach ($responseHeader as $key => $value) {
+            if(is_array($value)){
+                $value = join(',',$value);
+            }
             $this->response->header($key, $value);
         }
     }
@@ -153,7 +179,7 @@ class Sandbox extends Container
 
 
     protected function initInterpreterConfig(): void{
-        $interpreterName = config('http.structure_name.interpreter', 'http');
+        $interpreterName = config('http.structure_name.package', 'http');
         $configName = config('http.structure_name.config', 'config');
 
         $files = [];
@@ -284,7 +310,11 @@ class Sandbox extends Container
 
     protected function execute(\Closure $callback = null)
     {
-        $namespace = $this->getInterfaceNamespace();
+        HttpRouter::load($this->app);
+        $namespace = HttpRouter::findClass($this->pathinfo);
+        if($namespace === null){
+            $namespace = $this->getInterfaceNamespace();
+        }
         if (!class_exists($namespace)) {
             throw new ClassNotFoundException($namespace);
         }
@@ -294,7 +324,6 @@ class Sandbox extends Container
         $this->initInterface($class);
 
         $this->middleware($class);
-
         /**
          * @var $obj HttpApp
          */
@@ -326,13 +355,11 @@ class Sandbox extends Container
 
     protected function getInterfaceNamespace(): string
     {
-        $interpreterName = config('http.structure_name.interpreter', 'http');
-        $packageName = config('http.structure_name.package', 'package');
+        $packageName = config('http.structure_name.package', 'http');
         return join("\\", [
             '',
             'app',
             $this->app,
-            $interpreterName,
             $this->terminal,
             $packageName,
             $this->interface
@@ -349,26 +376,31 @@ class Sandbox extends Container
         try {
 
             if (!($e instanceof CliModeForcedInterruptException)) {
-                $interpreterName = config('http.structure_name.interpreter', 'http');
-
+                $name = config('http.customized_exception_handle_name','HttpExceptionHandle');
                 $customizedHandle = join("\\",[
                     "",
-                    "app",
+                    trim($this->bootOptions->dir_app,'/'),
                     $this->app,
-                    $interpreterName,
                     $this->terminal,
-                    'HttpExceptionHandle',
+                    $name,
                 ]);
-
                 $handle = "\\pms\\HttpExceptionHandle";
-                if ($inUser && class_exists($customizedHandle)) {
-                    $handle = $customizedHandle;
+                if($inUser){
+                    if (class_exists($customizedHandle)) {
+                        $handle = $customizedHandle;
+                    }else{
+                        $customizedHandle = config('http.exception_handle');
+                        if(class_exists($customizedHandle)){
+                            $handle = $customizedHandle;
+                        }
+                    }
                 }
                 $class = $this->getClass($handle);
                 /**
                  * @var HttpExceptionHandle $obj
                  */
                 $obj = $this->invokeClass($class, [
+                    $this->bootOptions->error_debug,
                     $e,
                     function ($code) {
                         $this->response->status($code);

@@ -31,8 +31,8 @@ class HttpExceptionHandle{
         return $this->content;
     }
 
-    final public function __construct(\Throwable $exception,\Closure $statusCode){
-        $this->debug = config('app.debug',false);
+    final public function __construct(bool $debug,\Throwable $exception,\Closure $statusCode){
+        $this->debug = $debug;
         $this->content = $this->handle($exception,$statusCode);
     }
 
