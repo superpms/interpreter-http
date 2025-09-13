@@ -30,6 +30,7 @@ class Sandbox extends Container
     protected string $contentType = JSON_CONTENT_TYPE;
 
     protected string $app = '';
+    protected bool $stm = false;
     protected string $terminal = '';
     protected string $interface = '';
     protected string $pathinfo = '';
@@ -55,6 +56,7 @@ class Sandbox extends Container
 
             $this->analysisPathInfo();
 
+            // TODO:验证静态资源文件是否能正常读取
             if (!$this->inApp()) {
                 $this->response->status(500,"Gateway Not Found");
                 $this->response->end('Gateway Not Found');
@@ -94,7 +96,10 @@ class Sandbox extends Container
         $this->app = config('http.default.app', 'index');
         $this->terminal = config('http.default.terminal', 'index');
         $this->interface = config('http.default.interface', 'Index');
-
+        $stm = config('http.stm',[]);
+        if(is_string($stm)){
+            $stm = [$stm];
+        }
         foreach ($arr as $key => $value){
             if ($value == '' || $value == '.' || $value == '..') {
                 unset($arr[$key]);
@@ -117,7 +122,7 @@ class Sandbox extends Container
                 $this->interface = join("\\",array_slice($arr, 2));
                 break;
         }
-
+        $this->stm = in_array($this->app,$stm);
     }
 
 
@@ -206,7 +211,6 @@ class Sandbox extends Container
 
         $appPath = Path::getApp(
             $this->app,
-            $interpreterName,
             $this->terminal,
             $configName
         );
@@ -245,7 +249,6 @@ class Sandbox extends Container
     protected function initInterface(ReflectionClass $interfaceClass): void
     {
         $this->contentType = $interfaceClass->getProperty('contentType')->getDefaultValue();
-
     }
 
     protected function middleware(ReflectionClass $interfaceClass): void
@@ -313,7 +316,10 @@ class Sandbox extends Container
     protected function execute(\Closure $callback = null)
     {
         HttpRouter::load($this->app);
-        $namespace = HttpRouter::findClass($this->pathinfo);
+        $namespace = HttpRouter::findClass($this->pathinfo,[
+            'app' => $this->app,
+            'terminal' => $this->terminal,
+        ]);
         if($namespace === null){
             $namespace = $this->getInterfaceNamespace();
         }
@@ -355,9 +361,17 @@ class Sandbox extends Container
         return $data;
     }
 
-    protected function getInterfaceNamespace(): string
-    {
+    protected function getInterfaceNamespace(): string{
         $packageName = config('http.structure_name.package', 'http');
+        if($this->stm){
+            return join("\\", [
+                '',
+                'app',
+                $this->app,
+                $packageName,
+                $this->interface
+            ]);
+        }
         return join("\\", [
             '',
             'app',
@@ -379,13 +393,23 @@ class Sandbox extends Container
 
             if (!($e instanceof CliModeForcedInterruptException)) {
                 $name = config('http.customized_exception_handle_name','HttpExceptionHandle');
-                $customizedHandle = join("\\",[
-                    "",
-                    trim($this->bootOptions->dir_app,'/'),
-                    $this->app,
-                    $this->terminal,
-                    $name,
-                ]);
+                if($this->stm){
+                    $customizedHandle = join("\\",[
+                        "",
+                        trim($this->bootOptions->dir_app,'/'),
+                        $this->app,
+                        $name,
+                    ]);
+                }else{
+                    $customizedHandle = join("\\",[
+                        "",
+                        trim($this->bootOptions->dir_app,'/'),
+                        $this->app,
+                        $this->terminal,
+                        $name,
+                    ]);
+                }
+
                 $handle = "\\pms\\HttpExceptionHandle";
                 if($inUser){
                     if (class_exists($customizedHandle)) {

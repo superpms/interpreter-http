@@ -77,8 +77,16 @@ class Driver
      * @param string $path 路由路径
      * @return string|null 返回对应的处理类名，如果未找到则返回null
      */
-    protected function _findClass(string $path)
+    protected function _findClass(string $path,$option = [])
     {
+        if(!empty($option)){
+            foreach ($this->container as $router => $item){
+                foreach ($option as $key => $value) {
+                    $router = str_replace('{$'.strtoupper($key).'}',strtoupper($value),$router);
+                }
+                $this->container[$router] = $item;
+            }
+        }
         return $this->container[strtoupper($path)] ?? null;
     }
 

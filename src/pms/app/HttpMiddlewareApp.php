@@ -2,6 +2,7 @@
 
 namespace pms\app;
 
+use pms\Container;
 use pms\contract\AppInterface;
 use pms\inject\HttpRequestInject;
 use pms\program\boot\Options;
@@ -22,5 +23,6 @@ abstract class HttpMiddlewareApp implements AppInterface
     {
     }
 
+    public function callback(Container &$server): void{}
 
 }
