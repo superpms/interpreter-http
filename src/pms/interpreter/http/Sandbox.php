@@ -56,7 +56,8 @@ class Sandbox extends Container
             $this->analysisPathInfo();
 
             if (!$this->inApp()) {
-                $this->sendFile($this->request->pathinfo());
+                $this->response->status(500,"Gateway Not Found");
+                $this->response->end('Gateway Not Found');
                 return true;
             }
             if (!$this->inTerminal()) {
@@ -86,7 +87,8 @@ class Sandbox extends Container
     }
 
 
-    protected function analysisPathInfo(){
+    protected function analysisPathInfo(): void
+    {
         $pathinfo = $this->pathinfo;
         $arr = explode("/",$pathinfo);
         $this->app = config('http.default.app', 'index');
@@ -103,15 +105,15 @@ class Sandbox extends Container
             case 0:
                 break;
             case 1:
-                $this->app = $arr[0];
+                $this->terminal = $arr[0];
                 break;
             case 2:
-                $this->app = $arr[0];
-                $this->terminal = $arr[1];
+                $this->terminal = $arr[0];
+                $this->app = $arr[1];
                 break;
             default:
-                $this->app = $arr[0];
-                $this->terminal = $arr[1];
+                $this->terminal = $arr[0];
+                $this->app = $arr[1];
                 $this->interface = join("\\",array_slice($arr, 2));
                 break;
         }
