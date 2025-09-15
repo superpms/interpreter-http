@@ -31,6 +31,7 @@ class Sandbox extends Container
 
     protected string $app = '';
     protected bool $stm = false;
+    protected string $terminalMode = 'single';
     protected string $terminal = '';
     protected string $interface = '';
     protected string $pathinfo = '';
@@ -96,10 +97,6 @@ class Sandbox extends Container
         $this->app = config('http.default.app', 'index');
         $this->terminal = config('http.default.terminal', 'index');
         $this->interface = config('http.default.interface', 'Index');
-        $stm = config('http.stm',[]);
-        if(is_string($stm)){
-            $stm = [$stm];
-        }
         foreach ($arr as $key => $value){
             if ($value == '' || $value == '.' || $value == '..') {
                 unset($arr[$key]);
@@ -122,7 +119,24 @@ class Sandbox extends Container
                 $this->interface = join("\\",array_slice($arr, 2));
                 break;
         }
-        $this->stm = in_array($this->app,$stm);
+
+
+        // 检测当前应用是否为STM
+        $this->terminalMode = config('http.terminal_mode', 'single');
+        if($this->terminalMode === 'multiple'){
+            $stm = config('http.stm',[]);
+            if(is_string($stm)){
+                $stm = [$stm];
+            }
+            $this->stm = in_array($this->app,$stm);
+        }else{
+            $mtm = config('http.mtm',[]);
+            if(is_string($mtm)){
+                $mtm = [$mtm];
+            }
+            $this->stm = !in_array($this->app,$mtm);
+        }
+
     }
 
 
