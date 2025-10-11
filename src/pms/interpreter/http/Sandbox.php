@@ -57,14 +57,18 @@ class Sandbox extends Container
 
             $this->analysisPathInfo();
 
-            // TODO:验证静态资源文件是否能正常读取
             if (!$this->inApp()) {
-                $this->response->status(500,"Gateway Not Found");
-                $this->response->end('Gateway Not Found');
+                if($this->inStatic()){
+                    $this->sendFile($this->request->pathinfo());
+                }else{
+                    $this->response->status(500,"Gateway Not Found");
+                    $this->response->end('Gateway Not Found');
+                }
                 return true;
             }
             if (!$this->inTerminal()) {
-                $this->sendFile($this->request->pathinfo());
+                $this->response->status(500,"Gateway Not Found");
+                $this->response->end('Gateway Not Found');
                 return true;
             }
 
@@ -155,6 +159,15 @@ class Sandbox extends Container
             }
         }
         return in_array($this->app, $realApp);
+    }
+
+    protected function inStatic(): bool
+    {
+        $static = config('http.static',[]);
+        if (is_string($static)) {
+            $static = [$static];
+        }
+        return in_array($this->terminal, $static);
     }
 
 
