@@ -15,21 +15,28 @@ class Interpreter extends InterpreterApp{
         Path::mount('WebRoot', Path::getRoot(config('http.structure_name.web_root','public')));
         $request = new HttpRequest();
         $response = new HttpResponse();
-        self::customShutDownHandler($response);
+        self::customShutDownHandler($response,$bootOptions);
         return (new Sandbox($request,$response,$bootOptions))->run();
     }
 
-    public static function customShutDownHandler($response): void{
-        register_shutdown_function(function ()use($response) {
+    public static function customShutDownHandler(HttpResponse $response,\pms\program\boot\Options $bootOptions): void{
+        register_shutdown_function(function ()use($response,$bootOptions) {
             $error = error_get_last();
             if (!empty($error)) {
                 ob_end_clean();
                 $response->status(500, 'Server Error');
-                if (config('app.debug')) {
+                if ($bootOptions->error_debug) {
                     $response->header("content-type", JSON_CONTENT_TYPE);
-                    $response->end(json_encode($error));
+                    $response->end(json_encode([
+                        'error' => $error,
+                        'code' => 500,
+                        'message' => '系统内部错误',
+                    ]));
                 } else {
-                    $response->end();
+                    $response->end(json_encode([
+                        'message' => '系统内部错误',
+                        'code' => 500
+                    ]));
                 }
             }
         });

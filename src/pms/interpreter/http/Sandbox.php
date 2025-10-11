@@ -417,7 +417,6 @@ class Sandbox extends Container
      */
     protected function exceptionHandle(\Throwable $e, bool $inUser = true): void{
         try {
-
             if (!($e instanceof CliModeForcedInterruptException)) {
                 $name = config('http.customized_exception_handle_name','HttpExceptionHandle');
                 if($this->stm){
