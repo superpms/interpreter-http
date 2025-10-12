@@ -4,7 +4,6 @@ declare(strict_types=1);
 namespace pms\app;
 
 use pms\contract\AppInterface;
-use pms\inject\HttpRequestInject;
 use pms\program\boot\Options;
 
 abstract class HttpApp implements AppInterface

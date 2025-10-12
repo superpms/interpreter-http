@@ -460,6 +460,7 @@ class Sandbox extends Container
                 $data = $this->contentToString($obj->getContent(), $this->contentType);
                 $this->response->end($data);
             } else {
+                $this->response->setStatusCode(500);
                 $this->response->end('');
             }
         } catch (\Throwable $e) {
