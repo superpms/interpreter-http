@@ -56,14 +56,13 @@ class Sandbox extends Container
             $this->pathinfo = $this->request->pathinfo();
 
             $this->analysisPathInfo();
-
+            if($this->inStatic()){
+                $this->sendFile($this->request->pathinfo());
+                return true;
+            }
             if (!$this->inApp()) {
-                if($this->inStatic()){
-                    $this->sendFile($this->request->pathinfo());
-                }else{
-                    $this->response->status(500,"Gateway Not Found");
-                    $this->response->end('Gateway Not Found');
-                }
+                $this->response->status(500,"Gateway Not Found");
+                $this->response->end('Gateway Not Found');
                 return true;
             }
             if (!$this->inTerminal()) {
