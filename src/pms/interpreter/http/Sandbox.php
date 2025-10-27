@@ -457,7 +457,14 @@ class Sandbox extends Container
                         $this->response->status($code);
                     }
                 ]);
-                $data = $this->contentToString($obj->getContent(), $this->contentType);
+
+
+                $content = $obj->getContent();
+                $data = $this->contentToString($content, $this->contentType);
+                if($data === false){
+                    unset($content['trace']);
+                    $data = $this->contentToString($content, $this->contentType);
+                }
                 $this->response->end($data);
             } else {
                 $this->response->setStatusCode(500);

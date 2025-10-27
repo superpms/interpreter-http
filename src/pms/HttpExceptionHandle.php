@@ -14,11 +14,11 @@ class HttpExceptionHandle{
      * 状态码
      * @var array|int[]
      */
-    protected array $handle = [
-        SystemException::class,
-        WarningException::class,
-        ClassNotFoundException::class,
-        FuncNotFoundException::class,
+    protected array $handleCodeMap = [
+        SystemException::class=>501,
+        WarningException::class=>502,
+        ClassNotFoundException::class=>504,
+        FuncNotFoundException::class=>504,
     ];
 
     protected bool $debug;
@@ -26,6 +26,11 @@ class HttpExceptionHandle{
     protected mixed $content;
 
     protected HttpResponseInject $response;
+
+    final protected function setHandleCode($handle,int $code): void
+    {
+        $this->handleCodeMap[$handle] = $code;
+    }
 
     final public function getContent(): mixed{
         return $this->content;
@@ -37,39 +42,43 @@ class HttpExceptionHandle{
     }
 
     public function handle(\Throwable $exception, \Closure $statusCode): array{
-        if($exception instanceof SystemException){
+        $result = [];
+        if(isset($this->handleCodeMap[$exception::class])) {
+            $result['code'] = $this->handleCodeMap[$exception::class];
+        }else if(method_exists($exception,"getCode")) {
+            $result['code'] = $exception->getCode();
+        }else{
+            $result['code'] = 500;
+        }
+        if(method_exists($exception,"getMessage")) {
+            $result['message'] = $exception->getMessage();
+        }
+        if($this->debug){
+            if(method_exists($exception,"getFile")) {
+                $result['file'] = $exception->getFile();
+            }
+            if(method_exists($exception,"getLine")) {
+                $result['line'] = $exception->getLine();
+            }
+            if(method_exists($exception,"getTrace")) {
+                $result['trace'] = $exception->getTrace();
+            }
+        }
+        if($exception instanceof SystemException
+            || $exception instanceof WarningException){
             $statusCode(500);
-            $data = [
-                'message'=>$exception->getMessage(),
-                'code' => $exception->getCode(),
-            ];
+            if(!$this->debug){
+                $result['message'] = '系统内部错误';
+            }
         }else if(
             $exception instanceof ClassNotFoundException
             || $exception instanceof FuncNotFoundException
         ){
             $statusCode(500);
-            $data = [
-                'message'=>'类或方法不存在',
-                'code' => 504,
-            ];
-            if($this->debug){
-                $data['message'] = $exception->getMessage();
-                $data['file'] = $exception->getFile();
-                $data['line'] = $exception->getLine();
-                $data['trace'] = $exception->getTrace();
-            }
-        }else{
-            $data = [
-                'message' => $exception->getMessage(),
-                'code' => 500,
-            ];
-            if($this->debug){
-                $data['message'] = $exception->getMessage();
-                $data['file'] = $exception->getFile();
-                $data['line'] = $exception->getLine();
-                $data['trace'] = $exception->getTrace();
+            if(!$this->debug){
+                $result['message'] = '类或方法不存在';
             }
         }
-        return $data;
+        return $result;
     }
 }
