@@ -352,9 +352,12 @@ class Sandbox extends Container
         if (!class_exists($namespace)) {
             throw new ClassNotFoundException($namespace);
         }
+        $class = $this->getInterfaceClass($namespace);
+        if(!$class->isSubclassOf(HttpApp::class)){
+            throw new ClassNotFoundException($namespace);
+        }
         $this->initInterpreterConfig();
 
-        $class = $this->getInterfaceClass($namespace);
         $this->initInterface($class);
 
         $this->middleware($class);
