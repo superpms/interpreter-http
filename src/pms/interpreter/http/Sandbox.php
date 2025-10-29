@@ -17,6 +17,8 @@ use pms\exception\ClassNotFoundException;
 use pms\exception\CliModeForcedInterruptException;
 
 use pms\facade\Path;
+use pms\inject\HttpRouteInject;
+use pms\interpreter\http\sandbox\HttpRoute;
 use pms\program\boot\Options;
 use ReflectionClass;
 
@@ -25,6 +27,7 @@ class Sandbox extends Container
 {
     protected HttpRequestInject $request;
     protected HttpResponseInject $response;
+    protected HttpRouteInject $route;
     protected Options $bootOptions;
     protected array $middlewares = [];
     protected string $contentType = JSON_CONTENT_TYPE;
@@ -46,33 +49,37 @@ class Sandbox extends Container
     {
         try {
             $this->initCors();
-
             if ($this->request->isOptions()) {
                 $this->response->end();
                 return true;
             }
+
             set_error_handler('HttpCustomErrorHandler');
 
-            $this->pathinfo = $this->request->pathinfo();
+            $this->route = new HttpRoute($this->request->pathinfo());
 
-            $this->analysisPathInfo();
-            if($this->inStatic()){
+            if($this->route->inStatic()){
                 $this->sendFile($this->request->pathinfo());
                 return true;
             }
-            if (!$this->inApp()) {
-                $this->response->status(500,"Gateway Not Found");
-                $this->response->end('Gateway Not Found');
-                return true;
-            }
-            if (!$this->inTerminal()) {
+
+            if (!$this->route->inApp()) {
                 $this->response->status(500,"Gateway Not Found");
                 $this->response->end('Gateway Not Found');
                 return true;
             }
 
+            if (!$this->route->inTerminal()) {
+                $this->response->status(500,"Gateway Not Found");
+                $this->response->end('Gateway Not Found');
+                return true;
+            }
             $this->request->init();
+
             $this->putInject();
+
+            $this->route->loadInterfaceClass();
+
             $data = $this->execute(function (ReflectionClass $class, AppInterface $obj) {
                 $contentType = $class->getProperty('contentType');
                 $this->contentType = $contentType->getValue($obj);
@@ -93,88 +100,57 @@ class Sandbox extends Container
     }
 
 
-    protected function analysisPathInfo(): void
-    {
-        $pathinfo = $this->pathinfo;
-        $arr = explode("/",$pathinfo);
-        $this->app = config('http.default.app', 'index');
-        $this->terminal = config('http.default.terminal', 'index');
-        $this->interface = config('http.default.interface', 'Index');
-        foreach ($arr as $key => $value){
-            if ($value == '' || $value == '.' || $value == '..') {
-                unset($arr[$key]);
-            }
-        }
-        $arr = array_values($arr);
-        switch (count($arr)){
-            case 0:
-                break;
-            case 1:
-                $this->terminal = $arr[0];
-                break;
-            case 2:
-                $this->terminal = $arr[0];
-                $this->app = $arr[1];
-                break;
-            default:
-                $this->terminal = $arr[0];
-                $this->app = $arr[1];
-                $this->interface = join("\\",array_slice($arr, 2));
-                break;
-        }
+//    protected function analysisPathInfo(): void
+//    {
+//        $pathinfo = $this->pathinfo;
+//        $arr = explode("/",$pathinfo);
+//        $this->app = config('http.default.app', 'index');
+//        $this->terminal = config('http.default.terminal', 'index');
+//        $this->interface = config('http.default.interface', 'Index');
+//        foreach ($arr as $key => $value){
+//            if ($value == '' || $value == '.' || $value == '..') {
+//                unset($arr[$key]);
+//            }
+//        }
+//        $arr = array_values($arr);
+//        switch (count($arr)){
+//            case 0:
+//                break;
+//            case 1:
+//                $this->terminal = $arr[0];
+//                break;
+//            case 2:
+//                $this->terminal = $arr[0];
+//                $this->app = $arr[1];
+//                break;
+//            default:
+//                $this->terminal = $arr[0];
+//                $this->app = $arr[1];
+//                $this->interface = join("\\",array_slice($arr, 2));
+//                break;
+//        }
+//
+//
+//        // 检测当前应用是否为STM
+//        $this->terminalMode = config('http.terminal_mode', 'single');
+//        if($this->terminalMode === 'multiple'){
+//            $stm = config('http.stm',[]);
+//            if(is_string($stm)){
+//                $stm = [$stm];
+//            }
+//            $this->stm = in_array($this->app,$stm);
+//        }else{
+//            $mtm = config('http.mtm',[]);
+//            if(is_string($mtm)){
+//                $mtm = [$mtm];
+//            }
+//            $this->stm = !in_array($this->app,$mtm);
+//        }
+//
+//    }
 
 
-        // 检测当前应用是否为STM
-        $this->terminalMode = config('http.terminal_mode', 'single');
-        if($this->terminalMode === 'multiple'){
-            $stm = config('http.stm',[]);
-            if(is_string($stm)){
-                $stm = [$stm];
-            }
-            $this->stm = in_array($this->app,$stm);
-        }else{
-            $mtm = config('http.mtm',[]);
-            if(is_string($mtm)){
-                $mtm = [$mtm];
-            }
-            $this->stm = !in_array($this->app,$mtm);
-        }
 
-    }
-
-
-
-    protected function inApp(): bool{
-        $apps = config('http.apps',[]);
-        if (is_string($apps)) {
-            $apps = [$apps];
-        }
-        $realApp = [];
-        foreach ($apps as $key => $value){
-            if(is_string($key)){
-                $realApp[] = $key;
-            }else if(is_string($value)){
-                $realApp[] = $value;
-            }
-        }
-        return in_array($this->app, $realApp);
-    }
-
-    protected function inStatic(): bool
-    {
-        $static = config('http.static',[]);
-        if (is_string($static)) {
-            $static = [$static];
-        }
-        return in_array($this->terminal, $static);
-    }
-
-
-    protected function inTerminal(): bool{
-        $exclude = config('http.exclude_terminal',[]);
-        $current = $this->app . '.' .$this->terminal;
-        return !in_array($current, $exclude);
-    }
 
 
     protected function initCors(): void{
@@ -208,6 +184,7 @@ class Sandbox extends Container
     {
         $this->put(HttpRequestInject::class, $this->request);
         $this->put(HttpResponseInject::class, $this->response);
+        $this->put(HttpRouteInject::class, $this->route);
     }
 
 
@@ -341,20 +318,12 @@ class Sandbox extends Container
 
     protected function execute(\Closure $callback = null)
     {
-        HttpRouter::load($this->app);
-        $namespace = HttpRouter::findClass($this->pathinfo,[
-            'app' => $this->app,
-            'terminal' => $this->terminal,
-        ]);
-        if($namespace === null){
-            $namespace = $this->getInterfaceNamespace();
+        if (!class_exists($this->route->interfaceClass)) {
+            throw new ClassNotFoundException($this->route->interfaceClass);
         }
-        if (!class_exists($namespace)) {
-            throw new ClassNotFoundException($namespace);
-        }
-        $class = $this->getInterfaceClass($namespace);
+        $class = $this->getInterfaceClass($this->route->interfaceClass);
         if(!$class->isSubclassOf(HttpApp::class)){
-            throw new ClassNotFoundException($namespace);
+            throw new ClassNotFoundException($this->route->interfaceClass);
         }
         $this->initInterpreterConfig();
 
