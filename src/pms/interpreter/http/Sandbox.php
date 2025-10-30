@@ -7,7 +7,6 @@ use pms\contract\AppInterface;
 use pms\app\HttpMiddlewareApp;
 use pms\Container;
 use pms\facade\Config;
-use pms\facade\HttpRouter;
 use pms\HttpExceptionHandle;
 use pms\inject\HttpRequestInject;
 use pms\inject\HttpResponseInject;
@@ -32,12 +31,6 @@ class Sandbox extends Container
     protected array $middlewares = [];
     protected string $contentType = JSON_CONTENT_TYPE;
 
-    protected string $app = '';
-    protected bool $stm = false;
-    protected string $terminalMode = 'single';
-    protected string $terminal = '';
-    protected string $interface = '';
-    protected string $pathinfo = '';
 
     public function __construct(HttpRequestInject $request, HttpResponseInject $response,Options $bootOptions){
         $this->request = $request;
@@ -212,9 +205,10 @@ class Sandbox extends Container
             }
         }
 
+        // TODO:后续优化下方代码(处理config 模块功能分散问题)
         $appPath = Path::getApp(
-            $this->app,
-            $this->terminal,
+            $this->route->app,
+            $this->route->terminal,
             $configName
         );
         if(is_dir($appPath)){
@@ -267,9 +261,9 @@ class Sandbox extends Container
         $this->runMiddleware($this->middlewares, [
             $interfaceClass,
             $this->request,
-            $this->app,
-            $this->terminal,
-            $this->interface,
+            $this->route->app,
+            $this->route->terminal,
+            $this->route->interface,
             $this->bootOptions
         ]);
 
@@ -334,8 +328,8 @@ class Sandbox extends Container
          * @var $obj HttpApp
          */
         $obj = $this->invokeClass($class);
-        $obj->app = $this->app;
-        $obj->terminal = $this->terminal;
+        $obj->app = $this->route->app;
+        $obj->terminal = $this->route->terminal;
         $obj->bootOptions = $this->bootOptions;
 
         if(method_exists($obj,'__prepare')) {
@@ -359,26 +353,6 @@ class Sandbox extends Container
         return $data;
     }
 
-    protected function getInterfaceNamespace(): string{
-        $packageName = config('http.structure_name.package', 'http');
-        if($this->stm){
-            return join("\\", [
-                '',
-                'app',
-                $this->app,
-                $packageName,
-                $this->interface
-            ]);
-        }
-        return join("\\", [
-            '',
-            'app',
-            $this->app,
-            $this->terminal,
-            $packageName,
-            $this->interface
-        ]);
-    }
 
     /**
      * 加载异常处理器
@@ -390,19 +364,19 @@ class Sandbox extends Container
         try {
             if (!($e instanceof CliModeForcedInterruptException)) {
                 $name = config('http.customized_exception_handle_name','HttpExceptionHandle');
-                if($this->stm){
+                if($this->route->stm){
                     $customizedHandle = join("\\",[
                         "",
                         trim($this->bootOptions->dir_app,'/'),
-                        $this->app,
+                        $this->route->app,
                         $name,
                     ]);
                 }else{
                     $customizedHandle = join("\\",[
                         "",
                         trim($this->bootOptions->dir_app,'/'),
-                        $this->app,
-                        $this->terminal,
+                        $this->route->app,
+                        $this->route->terminal,
                         $name,
                     ]);
                 }
