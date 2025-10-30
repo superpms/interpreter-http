@@ -2,86 +2,100 @@
 
 namespace pms\interpreter\http\sandbox;
 
+use pms\CfgOptions;
 use pms\facade\HttpRouter;
+use pms\HttpExceptionHandle;
 use pms\inject\HttpRouteInject;
+use pms\program\boot\Options;
 
-class HttpRoute implements HttpRouteInject
+class HttpRoute extends CfgOptions implements HttpRouteInject
 {
 
-    public string $app;
 
-    public string $terminal;
-    public string $terminalMode;
-
-    public string $interface;
-    public ?string $interfaceClass = null;
-
-    public bool $stm;
-
-
-    public function __construct(protected string $pathinfo){
+    public function __construct(string $pathinfo,protected Options $bootOptions){
+        $this->interfaceClass = null;
+        $this->pathinfo = $pathinfo;
+        $this->app = config('http.app.default.app', 'index');
+        $this->terminal = config('http.app.default.terminal', 'index');
+        $this->terminalMode = config('http.app.mode', PMS_HTTP_APP_MODE_SINGLE);
+        $this->interface = config('http.app.default.interface', 'Index');
+        $this->model = config('http.app.route.mode',PMS_HTTP_ROUTE_MODE_APP);
         $this->analysisPathInfo();
+        $this->useTerminalMode();
+        $this->calcInStatic();
+        $this->calcInApp();
+        $this->calcInTerminal();
     }
 
-    protected function analysisPathInfo(): void
+    /**
+     * 激活
+     * @return void
+     */
+    public function activate(): void
     {
-        $pathinfo = $this->pathinfo;
-        $arr = explode("/",$pathinfo);
-        $this->app = config('http.default.app', 'index');
-        $this->terminal = config('http.default.terminal', 'index');
-        $this->interface = config('http.default.interface', 'Index');
-        foreach ($arr as $key => $value){
-            if ($value == '' || $value == '.' || $value == '..') {
-                unset($arr[$key]);
-            }
-        }
-        $arr = array_values($arr);
-        switch (count($arr)){
-            case 0:
-                break;
-            case 1:
-                $this->terminal = $arr[0];
-                break;
-            case 2:
-                $this->terminal = $arr[0];
-                $this->app = $arr[1];
-                break;
-            default:
-                $this->terminal = $arr[0];
-                $this->app = $arr[1];
-                $this->interface = join("\\",array_slice($arr, 2));
-                break;
-        }
-        // 检测当前应用是否为STM
-        $this->terminalMode = config('http.terminal_mode', 'single');
-        if($this->terminalMode === 'multiple'){
-            $stm = config('http.stm',[]);
-            if(is_string($stm)){
-                $stm = [$stm];
-            }
-            $this->stm = in_array($this->app,$stm);
-        }else{
-            $this->terminalMode = 'single';
-            $mtm = config('http.mtm',[]);
-            if(is_string($mtm)){
-                $mtm = [$mtm];
-            }
-            $this->stm = !in_array($this->app,$mtm);
-        }
+        $this->constructInterface();
+    }
+
+    /**
+     * 异常
+     * @return void
+     */
+    public function exception(){
 
     }
 
-    public function inStatic(): bool
+    protected function analysisPathInfo(): void{
+        // 提前过滤无效路径段
+        $arr = array_values(array_filter(explode("/", $this->pathinfo), function($value) {
+            return $value !== '' && $value !== '.' && $value !== '..';
+        }));
+        if(count($arr) === 0){
+            return;
+        }
+        if($this->model === PMS_HTTP_ROUTE_MODE_TERMINAL){
+            $this->terminal = $arr[0];
+            if(isset($arr[1])){
+                $this->app = $arr[1];
+            }
+        }else{
+            $this->model = PMS_HTTP_ROUTE_MODE_APP;
+            $this->app = $arr[0];
+            if(isset($arr[1])){
+                $this->terminal = $arr[1];
+            }
+        }
+        if(count($arr) > 2){
+            $this->interface = join("\\",array_slice($arr, 2));
+        }
+    }
+
+    protected function useTerminalMode(): void
+    {
+        $special = config('http.app.special',[]);
+        if(is_string($special)){
+            $special = [$special];
+        }
+        // 检测当前应用是否为 single
+        if($this->terminalMode === PMS_HTTP_APP_MODE_MULTIPLE){
+            $this->isStm = in_array($this->app,$special);
+        }else{
+            $this->terminalMode = PMS_HTTP_APP_MODE_SINGLE;
+            $this->isStm = !in_array($this->app,$special);
+        }
+    }
+
+
+    protected function calcInStatic(): void
     {
         $static = config('http.static',[]);
         if (is_string($static)) {
             $static = [$static];
         }
-        return in_array($this->terminal, $static);
+        $this->inStatic = in_array($this->terminal, $static);
     }
 
-    public function inApp(): bool{
-        $apps = config('http.apps',[]);
+    protected function calcInApp(): void{
+        $apps = config('http.app.provide',[]);
         if (is_string($apps)) {
             $apps = [$apps];
         }
@@ -93,16 +107,43 @@ class HttpRoute implements HttpRouteInject
                 $realApp[] = $value;
             }
         }
-        return in_array($this->app, $realApp);
+        $this->inApp = in_array($this->app, $realApp);
     }
 
-    public function inTerminal(): bool{
-        $exclude = config('http.exclude_terminal',[]);
+    protected function calcInTerminal(): void{
+        $exclude = config('http.app.exclude',[]);
         $current = $this->app . '.' .$this->terminal;
-        return !in_array($current, $exclude);
+        $this->inTerminal = !in_array($current, $exclude);
     }
 
-    protected function _loadInterfaceClass(): void
+    public function exceptionClass(){
+        $name = config('http.exception.app','HttpExceptionHandle');
+        if($this->isStm){
+            $customizedHandle = join("\\",[
+                "",
+                trim($this->bootOptions->dir_app,'/'),
+                $this->app,
+                $name,
+            ]);
+        }else{
+            $customizedHandle = join("\\",[
+                "",
+                trim($this->bootOptions->dir_app,'/'),
+                $this->app,
+                $this->terminal,
+                $name,
+            ]);
+        }
+        if(!class_exists($customizedHandle)){
+            $customizedHandle = config('http.exception.default','');
+            if(!class_exists($customizedHandle)){
+                $customizedHandle = HttpExceptionHandle::class;
+            }
+        }
+        return $customizedHandle;
+    }
+
+    protected function constructInterface(): void
     {
         HttpRouter::load($this->app);
         $namespace = HttpRouter::findClass($this->pathinfo,[
@@ -134,7 +175,7 @@ class HttpRoute implements HttpRouteInject
 
     protected function generateInterfaceNamespace($app, $terminal, $interface): string{
         $packageName = config('http.structure_name.package', 'http');
-        if($this->stm){
+        if($this->isStm){
             return join("\\", [
                 '',
                 'app',
@@ -154,11 +195,10 @@ class HttpRoute implements HttpRouteInject
     }
 
 
-
     public function __call(string $name, array $arguments){
         switch ($name){
-            case 'loadInterfaceClass':
-                $this->_loadInterfaceClass();
+            case 'constructInterface':
+                $this->_constructInterface();
         }
     }
 

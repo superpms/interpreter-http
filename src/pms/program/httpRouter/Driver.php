@@ -92,7 +92,7 @@ class Driver
     protected function _load(string $app): void
     {
         if (!array_key_exists($app, $this->config)) {
-            $fName = config('http.structure_name.router_file', 'http_router.php');
+            $fName = config('http.app.route.file', 'http_router.php');
             $path = Path::getApp($app, $fName);
             if (file_exists($path)) {
                 require_once $path;
@@ -147,7 +147,7 @@ class Driver
 
     protected function createInterfaceNamespace(bool $stm, string $app,string $terminal, string $interface): string
     {
-        $packageName = config('http.structure_name.package', 'http');
+        $packageName = config('http.structure.package', 'http');
         if ($stm) {
             return join("\\", [
                 '',

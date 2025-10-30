@@ -38,7 +38,7 @@ class DevHttpServerCommand extends TerminalCommandApp{
         $port = $this->input->getOption('port');
         $root = $this->input->getOption('root');
         if (empty($root)) {
-            $root = config('http.structure_name.web_root','public');
+            $root = config('http.root','public');
         }
         $command = sprintf(
             '%s -S %s:%d -t %s %s',

@@ -41,47 +41,40 @@ class Sandbox extends Container
     public function run(): bool
     {
         try {
+            $this->route = new HttpRoute($this->request->pathinfo(),$this->bootOptions);
             $this->initCors();
             if ($this->request->isOptions()) {
                 $this->response->end();
                 return true;
             }
-
             set_error_handler('HttpCustomErrorHandler');
 
-            $this->route = new HttpRoute($this->request->pathinfo());
-
-            if($this->route->inStatic()){
+            if($this->route->inStatic){
                 $this->sendFile($this->request->pathinfo());
                 return true;
             }
 
-            if (!$this->route->inApp()) {
+            if (!$this->route->inApp) {
                 $this->response->status(500,"Gateway Not Found");
                 $this->response->end('Gateway Not Found');
                 return true;
             }
 
-            if (!$this->route->inTerminal()) {
+            if (!$this->route->inTerminal) {
                 $this->response->status(500,"Gateway Not Found");
                 $this->response->end('Gateway Not Found');
                 return true;
             }
             $this->request->init();
-
+            $this->route->activate();
             $this->putInject();
 
-            $this->route->loadInterfaceClass();
-
-            $data = $this->execute(function (ReflectionClass $class, AppInterface $obj) {
-                $contentType = $class->getProperty('contentType');
-                $this->contentType = $contentType->getValue($obj);
-            });
+            $result = $this->execute();
 
             if ($this->response->isWritable()) {
-                $data = $this->contentToString($data, $this->contentType);
+                $result = $this->contentToString($result, $this->contentType);
                 $this->response->header('Content-Type', $this->contentType);
-                $this->response->end($data);
+                $this->response->end($result);
             }
 
             return true;
@@ -91,60 +84,6 @@ class Sandbox extends Container
             return false;
         }
     }
-
-
-//    protected function analysisPathInfo(): void
-//    {
-//        $pathinfo = $this->pathinfo;
-//        $arr = explode("/",$pathinfo);
-//        $this->app = config('http.default.app', 'index');
-//        $this->terminal = config('http.default.terminal', 'index');
-//        $this->interface = config('http.default.interface', 'Index');
-//        foreach ($arr as $key => $value){
-//            if ($value == '' || $value == '.' || $value == '..') {
-//                unset($arr[$key]);
-//            }
-//        }
-//        $arr = array_values($arr);
-//        switch (count($arr)){
-//            case 0:
-//                break;
-//            case 1:
-//                $this->terminal = $arr[0];
-//                break;
-//            case 2:
-//                $this->terminal = $arr[0];
-//                $this->app = $arr[1];
-//                break;
-//            default:
-//                $this->terminal = $arr[0];
-//                $this->app = $arr[1];
-//                $this->interface = join("\\",array_slice($arr, 2));
-//                break;
-//        }
-//
-//
-//        // 检测当前应用是否为STM
-//        $this->terminalMode = config('http.terminal_mode', 'single');
-//        if($this->terminalMode === 'multiple'){
-//            $stm = config('http.stm',[]);
-//            if(is_string($stm)){
-//                $stm = [$stm];
-//            }
-//            $this->stm = in_array($this->app,$stm);
-//        }else{
-//            $mtm = config('http.mtm',[]);
-//            if(is_string($mtm)){
-//                $mtm = [$mtm];
-//            }
-//            $this->stm = !in_array($this->app,$mtm);
-//        }
-//
-//    }
-
-
-
-
 
     protected function initCors(): void{
         $responseHeader = config('http.cors', []);
@@ -182,118 +121,88 @@ class Sandbox extends Container
 
 
     protected function initInterpreterConfig(): void{
-        $interpreterName = config('http.structure_name.package', 'http');
-        $configName = config('http.structure_name.config', 'config');
+        $interpreterName = config('http.app.structure.package', 'http');
+        $configName = config('http.app.structure.config', 'config');
 
-        $files = [];
-
-        $interpreterPath = Path::getConfig(
+        $interpreterConfigPath = Path::getConfig(
             'interpreter',
             $interpreterName
         );
 
-        if(is_dir($interpreterPath)){
-            $files = [
-                ...$files,
-                ...glob($interpreterPath . '/*' . '.php')
-            ];
-        }
-        if (is_dev()){
-            $devConfigPath = path_join($interpreterPath, "dev");
-            if (is_dir($devConfigPath)) {
-                $files = array_merge($files, glob($devConfigPath . '/*.php'));
-            }
-        }
-
-        // TODO:后续优化下方代码(处理config 模块功能分散问题)
-        $appPath = Path::getApp(
+        $interpreterAppConfigPath = Path::getConfig(
+            'interpreter',
+            $interpreterName,
+            'app',
             $this->route->app,
-            $this->route->terminal,
-            $configName
         );
-        if(is_dir($appPath)){
-            $files = [
-                ...$files,
-                ...glob($appPath . '/*' . '.php')
-            ];
-        }
-        if (is_dev()){
-            $appDevConfigPath = path_join($appPath, "dev");
-            if (is_dir($appDevConfigPath)) {
-                $files = [
-                    ...$files,
-                    ...glob($appDevConfigPath . '/*.php')
-                ];
-            }
-        }
-        $configList = load_file_config($files);
-        foreach ($configList as $key => $value){
-            Config::mount($key, $value);
-        }
 
+        if($this->route->isStm){
+            $appConfigPath = Path::getApp(
+                $this->route->app,
+                $configName
+            );
+        }else{
+            $appConfigPath = Path::getApp(
+                $this->route->app,
+                $this->route->terminal,
+                $configName
+            );
+        }
+        Config::fetchConfig([
+            $interpreterConfigPath,
+            $interpreterAppConfigPath,
+            $appConfigPath
+        ]);
     }
 
-    protected function getInterfaceClass(string $classNamespace): ReflectionClass
-    {
-        try {
-            $actionClass = $this->getClass($classNamespace);
-        } catch (\Throwable $e) {
-            throw new ClassNotFoundException($classNamespace, $e);
-        }
-        return $actionClass;
-    }
-
-    protected function initInterface(ReflectionClass $interfaceClass): void
-    {
-        $this->contentType = $interfaceClass->getProperty('contentType')->getDefaultValue();
-    }
 
     protected function middleware(ReflectionClass $interfaceClass): void
     {
+        $middlewaresConfig = config('middleware',[]);
+        if (is_string($middlewaresConfig)) {
+            $middlewaresConfig = [$middlewaresConfig];
+        }
+
         $this->middlewares = array_unique([
             ...$this->middlewares,
             // 执行应用全局中间件
-            ...config('middleware',[]),
+            ...$middlewaresConfig,
             // 执行接口独立中间件
             ...$interfaceClass->getProperty('middleware')->getDefaultValue(),
         ]);
-
-        $this->runMiddleware($this->middlewares, [
-            $interfaceClass,
-            $this->request,
-            $this->route->app,
-            $this->route->terminal,
-            $this->route->interface,
-            $this->bootOptions
-        ]);
+        foreach ($this->middlewares as $item){
+            $this->runMiddleware($item, [
+                $interfaceClass,
+                $this->request,
+                $this->route->app,
+                $this->route->terminal,
+                $this->route->interface,
+                $this->bootOptions
+            ]);
+        }
 
     }
 
     /**
      * 执行中间件
-     * @param array|string $middlewares
+     * @param string $middlewares
      * @param array $args
      * @return void
      */
-    protected function runMiddleware(array|string $middlewares, array $args): void
+    protected function runMiddleware(string $middlewares, array $args): void
     {
-        if (is_string($middlewares)) {
-            $middlewares = [$middlewares];
-        }
-        foreach ($middlewares as $item) {
-            /**
-             * @var $obj HttpMiddlewareApp
-             */
-            if (class_exists($item)) {
-                $mClass = $this->getClass($item);
-                $obj = $this->invokeClass($mClass, $args);
-                $obj->entry();
-                if ($mClass->hasMethod('callback')) {
-                    $obj->callback($this);
-                }
-            } else {
-                throw new SystemException("middleware is not found:" . $item,503);
+        /**
+         * @var $obj HttpMiddlewareApp
+         */
+        if (class_exists($middlewares)) {
+            $mClass = $this->getClass($middlewares);
+            $obj = $this->invokeClass($mClass, $args);
+            $obj->entry();
+            if ($mClass->hasMethod('callback')) {
+                $obj->callback($this);
             }
+        } else {
+            throw new SystemException("middleware is not found:" . $middlewares,503);
         }
     }
 
@@ -310,18 +219,18 @@ class Sandbox extends Container
         };
     }
 
-    protected function execute(\Closure $callback = null)
+    protected function execute()
     {
         if (!class_exists($this->route->interfaceClass)) {
             throw new ClassNotFoundException($this->route->interfaceClass);
         }
-        $class = $this->getInterfaceClass($this->route->interfaceClass);
+        $class = $this->getClass($this->route->interfaceClass);
         if(!$class->isSubclassOf(HttpApp::class)){
             throw new ClassNotFoundException($this->route->interfaceClass);
         }
-        $this->initInterpreterConfig();
+        $this->contentType = $class->getProperty('contentType')->getDefaultValue();
 
-        $this->initInterface($class);
+        $this->initInterpreterConfig();
 
         $this->middleware($class);
         /**
@@ -343,10 +252,7 @@ class Sandbox extends Container
         if ($data === null) {
             $data = $class->getProperty('resRaw')->getValue($obj);
         }
-        if ($callback !== null) {
-            $callback($class, $obj);
-        }
-
+        $this->contentType = $class->getProperty('contentType')->getValue($obj);
         if(method_exists($obj,'__teardown')) {
             $obj->__teardown();
         }
@@ -363,36 +269,12 @@ class Sandbox extends Container
     protected function exceptionHandle(\Throwable $e, bool $inUser = true): void{
         try {
             if (!($e instanceof CliModeForcedInterruptException)) {
-                $name = config('http.customized_exception_handle_name','HttpExceptionHandle');
-                if($this->route->stm){
-                    $customizedHandle = join("\\",[
-                        "",
-                        trim($this->bootOptions->dir_app,'/'),
-                        $this->route->app,
-                        $name,
-                    ]);
-                }else{
-                    $customizedHandle = join("\\",[
-                        "",
-                        trim($this->bootOptions->dir_app,'/'),
-                        $this->route->app,
-                        $this->route->terminal,
-                        $name,
-                    ]);
-                }
-
-                $handle = "\\pms\\HttpExceptionHandle";
                 if($inUser){
-                    if (class_exists($customizedHandle)) {
-                        $handle = $customizedHandle;
-                    }else{
-                        $customizedHandle = config('http.exception_handle');
-                        if(class_exists($customizedHandle)){
-                            $handle = $customizedHandle;
-                        }
-                    }
+                    $handleClass = $this->route->exceptionClass();
+                }else{
+                    $handleClass = HttpExceptionHandle::class;
                 }
-                $class = $this->getClass($handle);
+                $class = $this->getClass($handleClass);
                 /**
                  * @var HttpExceptionHandle $obj
                  */
@@ -403,8 +285,6 @@ class Sandbox extends Container
                         $this->response->status($code);
                     }
                 ]);
-
-
                 $content = $obj->getContent();
                 $data = $this->contentToString($content, $this->contentType);
                 if($data === false){

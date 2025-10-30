@@ -15,7 +15,7 @@ class HttpRequest implements HttpRequestInject
     protected string $pathinfo;
     protected array $get = [];
     protected array $post = [];
-    protected string  $input = '';
+    protected string $input = "";
     protected array $files = [];
     protected array $cookie = [];
     protected array $params = [];
@@ -123,7 +123,7 @@ class HttpRequest implements HttpRequestInject
     }
 
     protected function getIsHttps(): bool{
-        $schemeName = config('web.request_header.scheme_name', 'x-forwarded-scheme');
+        $schemeName = config('http.header.scheme_name', 'x-forwarded-scheme');
         if(is_string($schemeName)){
             $schemeName = [$schemeName];
         }
@@ -141,7 +141,7 @@ class HttpRequest implements HttpRequestInject
     }
     protected function getIp(): string
     {
-        $ipName = config('web.request_header.ip_name', 'x-real-ip');
+        $ipName = config('http.header.ip_name', 'x-real-ip');
         if(is_string($ipName)){
             $ipName = [$ipName];
         }
