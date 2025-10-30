@@ -36,10 +36,10 @@ class HttpExceptionHandle
 
     final protected function setHandleCode(string|array $handles, int $code, ?Closure $closure = null): void
     {
-        if(is_string($handles)){
+        if (is_string($handles)) {
             $handles = [$handles];
         }
-        foreach ($handles as $handle){
+        foreach ($handles as $handle) {
             $this->handleCodeMap[$handle] = $code;
             if ($closure !== null) {
                 $this->handleClosure[$handle] = $closure;
@@ -47,7 +47,8 @@ class HttpExceptionHandle
         }
     }
 
-    final public function getContent(): mixed{
+    final public function getContent(): mixed
+    {
         return $this->content;
     }
 
@@ -59,11 +60,12 @@ class HttpExceptionHandle
         $this->content = $this->handle($exception, $statusCode);
     }
 
-    private function defaultSet(): void{
+    private function defaultSet(): void
+    {
         $this->setHandleCode([
             SystemException::class,
             WarningException::class
-        ], 500,function (\Throwable $exception, \Closure $statusCode){
+        ], 500, function (\Throwable $exception, \Closure $statusCode) {
             $statusCode(500);
             if (!$this->debug) {
                 return [
@@ -77,7 +79,7 @@ class HttpExceptionHandle
         $this->setHandleCode([
             ClassNotFoundException::class,
             FuncNotFoundException::class
-        ], 500,function (\Throwable $exception, \Closure $statusCode){
+        ], 500, function (\Throwable $exception, \Closure $statusCode) {
             $statusCode(500);
             if (!$this->debug) {
                 return [
@@ -91,17 +93,21 @@ class HttpExceptionHandle
 
     final protected function process(\Throwable $exception, \Closure $statusCode)
     {
-        $result = [];
+        $result = [
+            'message' => '系统内部错误'
+        ];
         if (isset($this->handleCodeMap[$exception::class])) {
             $result['code'] = $this->handleCodeMap[$exception::class];
-        } else if (method_exists($exception, "getCode")) {
-            $result['code'] = $exception->getCode();
         } else {
+            $statusCode(500);
             $result['code'] = 500;
         }
-        if (method_exists($exception, "getMessage")) {
-            $result['message'] = $exception->getMessage();
+        if (isset($this->handleCodeMap[$exception::class]) || $this->debug) {
+            if (method_exists($exception, "getMessage")) {
+                $result['message'] = $exception->getMessage();
+            }
         }
+
         if ($this->debug) {
             if (method_exists($exception, "getFile")) {
                 $result['file'] = $exception->getFile();
@@ -118,17 +124,22 @@ class HttpExceptionHandle
         }
         if (isset($this->handleClosure[$exception::class])) {
             $res = $this->handleClosure[$exception::class]($exception, $statusCode);
-            if(!empty($res) && is_array($res)){
-                $result = [
-                    ...$result,
-                    ...$res,
-                ];
+            if (!empty($res)) {
+                if (is_array($res)) {
+                    $result = [
+                        ...$result,
+                        ...$res,
+                    ];
+                } else {
+                    $result['message'] = $res;
+                }
             }
         }
         return $result;
     }
 
-    public function handle(\Throwable $exception, \Closure $statusCode): array{
+    public function handle(\Throwable $exception, \Closure $statusCode): array
+    {
         return $this->process($exception, $statusCode);
     }
 }
