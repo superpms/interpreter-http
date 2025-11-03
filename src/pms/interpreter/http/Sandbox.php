@@ -75,11 +75,7 @@ class Sandbox extends Container
             $this->route->activate();
             $this->putInject();
 
-            $result = $this->execute();
-
-
-
-            return true;
+            return $this->execute();
         } catch (\Throwable $e) {
             $this->response->header('Content-Type', $this->contentType);
             $this->exceptionHandle($e);
