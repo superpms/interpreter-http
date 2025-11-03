@@ -17,9 +17,9 @@ class HttpRoute extends CfgOptions implements HttpRouteInject
         $this->pathinfo = $pathinfo;
         $this->app = config('http.app.default.app', 'index');
         $this->terminal = config('http.app.default.terminal', 'index');
-        $this->terminalMode = config('http.app.mode', PMS_HTTP_APP_MODE_SINGLE);
+        $this->terminalMode = config('http.app.mode', HTTP_APP_MODE_SINGLE);
         $this->interface = config('http.app.default.interface', 'Index');
-        $this->model = config('http.app.route.mode',PMS_HTTP_ROUTE_MODE_APP);
+        $this->model = config('http.app.route.mode',HTTP_ROUTE_MODE_APP);
         $this->analysisPathInfo();
         $this->useTerminalMode();
         $this->calcInStatic();
@@ -52,13 +52,13 @@ class HttpRoute extends CfgOptions implements HttpRouteInject
         if(count($arr) === 0){
             return;
         }
-        if($this->model === PMS_HTTP_ROUTE_MODE_TERMINAL){
+        if($this->model === HTTP_ROUTE_MODE_TERMINAL){
             $this->terminal = $arr[0];
             if(isset($arr[1])){
                 $this->app = $arr[1];
             }
         }else{
-            $this->model = PMS_HTTP_ROUTE_MODE_APP;
+            $this->model = HTTP_ROUTE_MODE_APP;
             $this->app = $arr[0];
             if(isset($arr[1])){
                 $this->terminal = $arr[1];
@@ -76,10 +76,10 @@ class HttpRoute extends CfgOptions implements HttpRouteInject
             $special = [$special];
         }
         // 检测当前应用是否为 single
-        if($this->terminalMode === PMS_HTTP_APP_MODE_MULTIPLE){
+        if($this->terminalMode === HTTP_APP_MODE_MULTIPLE){
             $this->isStm = in_array($this->app,$special);
         }else{
-            $this->terminalMode = PMS_HTTP_APP_MODE_SINGLE;
+            $this->terminalMode = HTTP_APP_MODE_SINGLE;
             $this->isStm = !in_array($this->app,$special);
         }
     }
