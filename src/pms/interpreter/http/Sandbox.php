@@ -49,10 +49,11 @@ class Sandbox extends Container
                 return true;
             }
             set_error_handler('HttpCustomErrorHandler');
-            HttpLifecycleHook::run(LIFECYCLE_SANDBOX_BOOTED,
+            HttpLifecycleHook::run(LIFECYCLE_SANDBOX_CREATED,
                 $this->request,
                 $this->response,
-                $this->route
+                $this->route,
+                $this->bootOptions
             );
             if($this->route->inStatic){
                 $this->sendFile($this->request->pathinfo());
@@ -76,17 +77,8 @@ class Sandbox extends Container
 
             $result = $this->execute();
 
-            if ($this->response->isWritable()) {
-                $result = $this->contentToString($result, $this->contentType);
-                $this->response->header('Content-Type', $this->contentType);
-                $this->response->end($result);
-            }
-            HttpLifecycleHook::run(LIFECYCLE_SANDBOX_RAN,
-                $this->request,
-                $this->response,
-                $this->route,
-                $result
-            );
+
+
             return true;
         } catch (\Throwable $e) {
             $this->response->header('Content-Type', $this->contentType);
@@ -182,12 +174,11 @@ class Sandbox extends Container
         ]);
         foreach ($this->middlewares as $item){
             $this->runMiddleware($item, [
-                $interfaceClass,
                 $this->request,
-                $this->route->app,
-                $this->route->terminal,
-                $this->route->interface,
-                $this->bootOptions
+                $this->response,
+                $this->route,
+                $this->bootOptions,
+                $interfaceClass,
             ]);
         }
 
@@ -216,16 +207,16 @@ class Sandbox extends Container
         }
     }
 
-    protected function contentToString(mixed $data, string $contentType)
+    protected function contentToString(mixed $result, string $contentType)
     {
-        if (is_string($data)) {
-            return $data;
+        if (is_string($result)) {
+            return $result;
         }
         return match ($contentType) {
-            JSON_CONTENT_TYPE => json_encode($data, 320),
-            JSONP_CONTENT_TYPE => $this->request->get('callback', 'callback') . '(' . json_encode($data) . ')',
-            XML_CONTENT_TYPE => array_to_xml($data),
-            default => is_array($data) || is_object($data) ? json_encode($data, 320) : $data,
+            JSON_CONTENT_TYPE => json_encode($result, 320),
+            JSONP_CONTENT_TYPE => $this->request->get('callback', 'callback') . '(' . json_encode($result) . ')',
+            XML_CONTENT_TYPE => array_to_xml($result),
+            default => is_array($result) || is_object($result) ? json_encode($result, 320) : $result,
         };
     }
 
@@ -242,6 +233,14 @@ class Sandbox extends Container
 
         $this->initInterpreterConfig();
 
+        HttpLifecycleHook::run(LIFECYCLE_SANDBOX_BOOT,
+            $this->request,
+            $this->response,
+            $this->route,
+            $this->bootOptions,
+            $class
+        );
+
         $this->middleware($class);
         /**
          * @var $obj HttpApp
@@ -251,6 +250,15 @@ class Sandbox extends Container
         $obj->terminal = $this->route->terminal;
         $obj->bootOptions = $this->bootOptions;
 
+        HttpLifecycleHook::run(LIFECYCLE_SANDBOX_BOOTED,
+            $this->request,
+            $this->response,
+            $this->route,
+            $this->bootOptions,
+            $class,
+            $obj
+        );
+
         if(method_exists($obj,'__prepare')) {
             $obj->__prepare();
         }
@@ -258,15 +266,31 @@ class Sandbox extends Container
         /**
          * @var $obj AppInterface
          */
-        $data = $obj->entry();
-        if ($data === null) {
-            $data = $class->getProperty('resRaw')->getValue($obj);
+        $result = $obj->entry();
+        if ($result === null) {
+            $result = $class->getProperty('resRaw')->getValue($obj);
         }
         $this->contentType = $class->getProperty('contentType')->getValue($obj);
         if(method_exists($obj,'__teardown')) {
             $obj->__teardown();
         }
-        return $data;
+
+        if ($this->response->isWritable()) {
+            $result = $this->contentToString($result, $this->contentType);
+            $this->response->header('Content-Type', $this->contentType);
+            $this->response->end($result);
+        }
+
+        HttpLifecycleHook::run(LIFECYCLE_SANDBOX_RAN,
+            $this->request,
+            $this->response,
+            $this->route,
+            $this->bootOptions,
+            $class,
+            $obj,
+            $result
+        );
+        return $result;
     }
 
 
@@ -296,12 +320,12 @@ class Sandbox extends Container
                     }
                 ]);
                 $content = $obj->getContent();
-                $data = $this->contentToString($content, $this->contentType);
-                if($data === false){
+                $result = $this->contentToString($content, $this->contentType);
+                if($result === false){
                     unset($content['trace']);
-                    $data = $this->contentToString($content, $this->contentType);
+                    $result = $this->contentToString($content, $this->contentType);
                 }
-                $this->response->end($data);
+                $this->response->end($result);
             } else {
                 $this->response->setStatusCode(500);
                 $this->response->end('');
