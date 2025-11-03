@@ -28,11 +28,6 @@ class DevHttpServerCommand extends TerminalCommandApp{
         ]
     ];
 
-    #[Inject(TerminalInputInject::class)]
-    protected TerminalInputInject $input;
-
-    #[Inject(TerminalOutputInject::class)]
-    protected TerminalOutputInject $output;
     public function entry(){
         $host = $this->input->getOption('host');
         $port = $this->input->getOption('port');
