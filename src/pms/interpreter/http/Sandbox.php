@@ -7,6 +7,7 @@ use pms\contract\AppInterface;
 use pms\app\HttpMiddlewareApp;
 use pms\Container;
 use pms\facade\Config;
+use pms\hook\HttpLifecycleHook;
 use pms\HttpExceptionHandle;
 use pms\inject\HttpRequestInject;
 use pms\inject\HttpResponseInject;
@@ -48,7 +49,11 @@ class Sandbox extends Container
                 return true;
             }
             set_error_handler('HttpCustomErrorHandler');
-
+            HttpLifecycleHook::run(LIFECYCLE_SANDBOX_BOOTED,
+                $this->request,
+                $this->response,
+                $this->route
+            );
             if($this->route->inStatic){
                 $this->sendFile($this->request->pathinfo());
                 return true;
@@ -76,7 +81,12 @@ class Sandbox extends Container
                 $this->response->header('Content-Type', $this->contentType);
                 $this->response->end($result);
             }
-
+            HttpLifecycleHook::run(LIFECYCLE_SANDBOX_RAN,
+                $this->request,
+                $this->response,
+                $this->route,
+                $result
+            );
             return true;
         } catch (\Throwable $e) {
             $this->response->header('Content-Type', $this->contentType);
@@ -303,4 +313,7 @@ class Sandbox extends Container
 
     }
 
+    public function __destruct(){
+        HttpLifecycleHook::run(LIFECYCLE_SANDBOX_DESTRUCT);
+    }
 }

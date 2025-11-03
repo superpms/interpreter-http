@@ -3,6 +3,7 @@
 namespace pms\interpreter\http;
 use pms\app\InterpreterApp;
 use pms\facade\Path;
+use pms\hook\HttpLifecycleHook;
 use pms\interpreter\http\sandbox\HttpRequest;
 use pms\interpreter\http\sandbox\HttpResponse;
 
@@ -12,10 +13,12 @@ class Interpreter extends InterpreterApp{
 
     public static function run(\pms\program\boot\Options $bootOptions): bool
     {
+        HttpLifecycleHook::run(LIFECYCLE_BOOT);
         Path::mount('WebRoot', Path::getRoot(config('http.web_root','/public')));
         $request = new HttpRequest();
         $response = new HttpResponse();
         self::customShutDownHandler($response,$bootOptions);
+        HttpLifecycleHook::run(LIFECYCLE_BOOTED);
         return (new Sandbox($request,$response,$bootOptions))->run();
     }
 
