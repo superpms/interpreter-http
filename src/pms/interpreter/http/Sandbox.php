@@ -39,7 +39,7 @@ class Sandbox extends Container
         $this->bootOptions = $bootOptions;
     }
 
-    public function run(): bool
+    public function run(): mixed
     {
         try {
             $this->route = new HttpRoute($this->request->pathinfo(),$this->bootOptions);
@@ -74,7 +74,6 @@ class Sandbox extends Container
             $this->request->init();
             $this->route->activate();
             $this->putInject();
-
             return $this->execute();
         } catch (\Throwable $e) {
             $this->response->header('Content-Type', $this->contentType);
