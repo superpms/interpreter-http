@@ -2,17 +2,18 @@
 
 namespace pms\interpreter\http\sandbox;
 
-use pms\CfgOptions;
 use pms\facade\HttpRouter;
 use pms\HttpExceptionHandle;
 use pms\inject\HttpRouteInject;
+use pms\OptionsAccess;
 use pms\program\boot\Options;
 
-class HttpRoute extends CfgOptions implements HttpRouteInject
+class HttpRoute extends OptionsAccess implements HttpRouteInject
 {
 
 
     public function __construct(string $pathinfo,protected Options $bootOptions){
+        parent::__construct();
         $this->interfaceClass = null;
         $this->pathinfo = $pathinfo;
         $this->app = config('http.app.default.app', 'index');
