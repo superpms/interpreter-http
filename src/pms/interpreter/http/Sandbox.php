@@ -80,7 +80,7 @@ class Sandbox extends Container
         } catch (\RuntimeException $e) {
             // 跳过php系统内部异常，转交给 register_shutdown_function
             $error = error_get_last();
-            if($error === null){
+            if($error === null || $error['type'] !== E_WARNING){
                 if ($this->response->isWritable()) {
                     $this->response->header('Content-Type', $this->contentType);
                     $this->exceptionHandle($e);
