@@ -22,5 +22,10 @@ const HTTP_ROUTE_MODE_TERMINAL = 'terminal';
 
 
 function HttpCustomErrorHandler($errno, $errstr, $errfile, int $errline){
+
+    if (!(error_reporting() & $errno)) {
+        // 这个错误代码未被包含在 error_reporting 中
+        return;
+    }
     throw new \pms\exception\WarningException($errno, $errstr, $errfile, $errline);
 }

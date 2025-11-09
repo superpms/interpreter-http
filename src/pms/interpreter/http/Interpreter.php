@@ -15,10 +15,11 @@ class Interpreter extends InterpreterApp{
     {
         HttpLifecycleHook::run(LIFECYCLE_BOOT);
         Path::mount('WebRoot', Path::getRoot(config('http.web_root','/public')));
+        HttpLifecycleHook::run(LIFECYCLE_BOOTED);
+
         $request = new HttpRequest();
         $response = new HttpResponse();
         self::customShutDownHandler($response,$bootOptions);
-        HttpLifecycleHook::run(LIFECYCLE_BOOTED);
         return (new Sandbox($request,$response,$bootOptions))->run();
     }
 
@@ -28,10 +29,11 @@ class Interpreter extends InterpreterApp{
             if (!empty($error)) {
                 ob_end_clean();
                 $response->status(500, 'Server Error');
+                $response->header("content-type", JSON_CONTENT_TYPE);
                 if ($bootOptions->error_debug) {
-                    $response->header("content-type", JSON_CONTENT_TYPE);
                     $response->end(json_encode([
                         'error' => $error,
+                        'type'=>'shutdown',
                         'code' => 500,
                         'message' => '系统内部错误',
                     ]));

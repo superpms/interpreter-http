@@ -33,7 +33,8 @@ class Sandbox extends Container
     protected string $contentType = JSON_CONTENT_TYPE;
 
 
-    public function __construct(HttpRequestInject $request, HttpResponseInject $response,Options $bootOptions){
+    public function __construct(HttpRequestInject $request, HttpResponseInject $response, Options $bootOptions)
+    {
         $this->request = $request;
         $this->response = $response;
         $this->bootOptions = $bootOptions;
@@ -74,21 +75,27 @@ class Sandbox extends Container
             $this->request->init();
             $this->route->activate();
             $this->putInject();
+
             return $this->execute();
-        } catch (\Throwable $e) {
-            if(!$this->response->isWritable()){
-                $this->response->header('Content-Type', $this->contentType);
-                $this->exceptionHandle($e);
+        } catch (\RuntimeException $e) {
+            // 跳过php系统内部异常，转交给 register_shutdown_function
+            $error = error_get_last();
+            if($error === null){
+                if ($this->response->isWritable()) {
+                    $this->response->header('Content-Type', $this->contentType);
+                    $this->exceptionHandle($e);
+                }
             }
             return false;
         }
     }
 
-    protected function initCors(): void{
+    protected function initCors(): void
+    {
         $responseHeader = config('http.cors', []);
         foreach ($responseHeader as $key => $value) {
-            if(is_array($value)){
-                $value = join(',',$value);
+            if (is_array($value)) {
+                $value = join(',', $value);
             }
             $this->response->header($key, $value);
         }
@@ -98,10 +105,10 @@ class Sandbox extends Container
     {
         $filePath = Path::getWebRoot($pathinfo);
         if (is_file($filePath)) {
-            try{
+            try {
                 $this->response->header('Content-Type', mime_content_type($filePath));
                 $this->response->end(file_get_contents($filePath));
-            }catch (\Throwable $e){
+            } catch (\Throwable $e) {
                 $this->response->status(404);
                 $this->response->end();
             }
@@ -119,7 +126,8 @@ class Sandbox extends Container
     }
 
 
-    protected function initInterpreterConfig(): void{
+    protected function initInterpreterConfig(): void
+    {
         $interpreterName = config('http.app.structure.package', 'http');
         $configName = config('http.app.structure.config', 'config');
 
@@ -135,12 +143,12 @@ class Sandbox extends Container
             $this->route->app,
         );
 
-        if($this->route->isStm){
+        if ($this->route->isStm) {
             $appConfigPath = Path::getApp(
                 $this->route->app,
                 $configName
             );
-        }else{
+        } else {
             $appConfigPath = Path::getApp(
                 $this->route->app,
                 $this->route->terminal,
@@ -157,7 +165,7 @@ class Sandbox extends Container
 
     protected function middleware(ReflectionClass $interfaceClass): void
     {
-        $middlewaresConfig = config('middleware',[]);
+        $middlewaresConfig = config('middleware', []);
         if (is_string($middlewaresConfig)) {
             $middlewaresConfig = [$middlewaresConfig];
         }
@@ -169,7 +177,7 @@ class Sandbox extends Container
             // 执行接口独立中间件
             ...$interfaceClass->getProperty('middleware')->getDefaultValue(),
         ]);
-        foreach ($this->middlewares as $item){
+        foreach ($this->middlewares as $item) {
             $this->runMiddleware($item, [
                 $this->request,
                 $this->response,
@@ -200,7 +208,7 @@ class Sandbox extends Container
                 $obj->callback($this);
             }
         } else {
-            throw new SystemException("middleware is not found:" . $middlewares,503);
+            throw new SystemException("middleware is not found:" . $middlewares, 503);
         }
     }
 
@@ -223,7 +231,7 @@ class Sandbox extends Container
             throw new ClassNotFoundException($this->route->interfaceClass);
         }
         $class = $this->getClass($this->route->interfaceClass);
-        if(!$class->isSubclassOf(HttpApp::class)){
+        if (!$class->isSubclassOf(HttpApp::class)) {
             throw new ClassNotFoundException($this->route->interfaceClass);
         }
         $this->contentType = $class->getProperty('contentType')->getDefaultValue();
@@ -256,7 +264,7 @@ class Sandbox extends Container
             $obj
         );
 
-        if(method_exists($obj,'__prepare')) {
+        if (method_exists($obj, '__prepare')) {
             $obj->__prepare();
         }
 
@@ -268,7 +276,7 @@ class Sandbox extends Container
             $result = $class->getProperty('resRaw')->getValue($obj);
         }
         $this->contentType = $class->getProperty('contentType')->getValue($obj);
-        if(method_exists($obj,'__teardown')) {
+        if (method_exists($obj, '__teardown')) {
             $obj->__teardown();
         }
 
@@ -297,12 +305,13 @@ class Sandbox extends Container
      * @param bool $inUser 是否使用应用内客制化处理器
      * @return void
      */
-    protected function exceptionHandle(\Throwable $e, bool $inUser = true): void{
+    protected function exceptionHandle(\Throwable $e, bool $inUser = true): void
+    {
         try {
             if (!($e instanceof CliModeForcedInterruptException)) {
-                if($inUser){
+                if ($inUser) {
                     $handleClass = $this->route->exceptionClass();
-                }else{
+                } else {
                     $handleClass = HttpExceptionHandle::class;
                 }
                 $class = $this->getClass($handleClass);
@@ -318,7 +327,7 @@ class Sandbox extends Container
                 ]);
                 $content = $obj->getContent();
                 $result = $this->contentToString($content, $this->contentType);
-                if($result === false){
+                if ($result === false) {
                     unset($content['trace']);
                     $result = $this->contentToString($content, $this->contentType);
                 }
@@ -334,7 +343,8 @@ class Sandbox extends Container
 
     }
 
-    public function __destruct(){
+    public function __destruct()
+    {
         HttpLifecycleHook::run(LIFECYCLE_SANDBOX_DESTRUCT);
     }
 }

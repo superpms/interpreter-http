@@ -52,7 +52,9 @@ class HttpResponse implements HttpResponseInject
 
     public function status(int $http_code, string $reason = ''): bool
     {
-        header("HTTP/1.1 $http_code $reason");
+        if(!headers_sent()){
+            header("HTTP/1.1 $http_code $reason");
+        }
         return true;
     }
 
@@ -63,10 +65,12 @@ class HttpResponse implements HttpResponseInject
 
     public function header(string $key, array|string $value, bool $format = true): bool
     {
-        //  $format 是否需要对 Key 进行 HTTP 约定格式化【默认 true 会自动格式化】
-        $key = $format ? strtolower(preg_replace('/([a-z])([A-Z])/', '$1-$2', $key)) : $key;
-        header_remove($key);
-        header("$key: $value");
+        if(!headers_sent()){
+            //  $format 是否需要对 Key 进行 HTTP 约定格式化【默认 true 会自动格式化】
+            $key = $format ? strtolower(preg_replace('/([a-z])([A-Z])/', '$1-$2', $key)) : $key;
+            header_remove($key);
+            header("$key: $value");
+        }
         return true;
     }
 
@@ -98,8 +102,10 @@ class HttpResponse implements HttpResponseInject
 
     public function end(?string $content = null): mixed
     {
-        header_remove('Connection');
-        header('Connection: close');
+       if(!headers_sent()){
+           header_remove('Connection');
+           header('Connection: close');
+       }
         if (!empty($this->trailer)) {
             header_remove('Trailer');
             header('Trailer: ' . implode(', ', array_keys($this->trailer)));
@@ -166,6 +172,7 @@ class HttpResponse implements HttpResponseInject
 
     public function detach(): bool
     {
+        $this->detach = true;
         return false;
     }
 
