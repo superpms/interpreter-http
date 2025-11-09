@@ -77,7 +77,7 @@ class Sandbox extends Container
             $this->putInject();
 
             return $this->execute();
-        } catch (\RuntimeException $e) {
+        } catch (\Throwable $e) {
             // 跳过php系统内部异常，转交给 register_shutdown_function
             $error = error_get_last();
             if($error === null || $error['type'] !== E_WARNING){
