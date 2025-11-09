@@ -76,8 +76,10 @@ class Sandbox extends Container
             $this->putInject();
             return $this->execute();
         } catch (\Throwable $e) {
-            $this->response->header('Content-Type', $this->contentType);
-            $this->exceptionHandle($e);
+            if($this->response->isWritable()){
+                $this->response->header('Content-Type', $this->contentType);
+                $this->exceptionHandle($e);
+            }
             return false;
         }
     }
