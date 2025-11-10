@@ -34,7 +34,7 @@ class HttpExceptionHandle
 
     protected HttpResponseInject $response;
 
-    final protected function setHandleCode(string|array $handles, int $code, ?Closure $closure = null): void
+    final protected function setHandleCode(string|array $handles, int|string $code, ?Closure $closure = null): void
     {
         if (is_string($handles)) {
             $handles = [$handles];
@@ -91,8 +91,8 @@ class HttpExceptionHandle
 
     }
 
-    final protected function process(\Throwable $exception, \Closure $statusCode)
-    {
+    final protected function process(\Throwable $exception, \Closure $statusCode): array
+	{
         $result = [
             'message' => '系统内部错误'
         ];
@@ -138,8 +138,11 @@ class HttpExceptionHandle
         return $result;
     }
 
+	protected function autoHandle(\Throwable $exception, \Closure $statusCode){}
+	
     public function handle(\Throwable $exception, \Closure $statusCode): array
     {
+		$this->autoHandle($exception, $statusCode);
         return $this->process($exception, $statusCode);
     }
 }
