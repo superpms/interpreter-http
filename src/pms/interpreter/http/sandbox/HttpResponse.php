@@ -4,6 +4,7 @@ namespace pms\interpreter\http\sandbox;
 
 
 use pms\inject\HttpResponseInject;
+use Throwable;
 
 class HttpResponse implements HttpResponseInject
 {
@@ -151,7 +152,7 @@ class HttpResponse implements HttpResponseInject
                 fclose($fp);
                 header('Content-Length: ' . ($length === 0 ? strlen($filename) : $length));
                 echo $content;
-            } catch (\Throwable $e) {
+            } catch (Throwable $e) {
                 // 处理异常
                 return false;
             }

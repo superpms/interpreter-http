@@ -7,7 +7,8 @@ use pms\exception\FuncNotFoundException;
 use pms\exception\SystemException;
 use pms\exception\WarningException;
 use pms\inject\HttpResponseInject;
-use \Closure;
+use Closure;
+use Throwable;
 
 class HttpExceptionHandle
 {
@@ -53,7 +54,7 @@ class HttpExceptionHandle
     }
 
 
-    final public function __construct(bool $debug, \Throwable $exception, \Closure $statusCode)
+    final public function __construct(bool $debug, Throwable $exception, Closure $statusCode)
     {
         $this->debug = $debug;
         $this->defaultSet();
@@ -65,7 +66,7 @@ class HttpExceptionHandle
         $this->setHandleCode([
             SystemException::class,
             WarningException::class
-        ], 500, function (\Throwable $exception, \Closure $statusCode) {
+        ], 500, function (Throwable $exception, Closure $statusCode) {
             $statusCode(500);
             if (!$this->debug) {
                 return [
@@ -79,7 +80,7 @@ class HttpExceptionHandle
         $this->setHandleCode([
             ClassNotFoundException::class,
             FuncNotFoundException::class
-        ], 500, function (\Throwable $exception, \Closure $statusCode) {
+        ], 500, function (Throwable $exception, Closure $statusCode) {
             $statusCode(500);
             if (!$this->debug) {
                 return [
@@ -91,7 +92,7 @@ class HttpExceptionHandle
 
     }
 
-    final protected function process(\Throwable $exception, \Closure $statusCode): array
+    final protected function process(Throwable $exception, Closure $statusCode): array
 	{
         $result = [
             'message' => '系统内部错误'
@@ -138,9 +139,9 @@ class HttpExceptionHandle
         return $result;
     }
 
-	protected function autoHandle(\Throwable $exception, \Closure $statusCode){}
+	protected function autoHandle(Throwable $exception, Closure $statusCode){}
 	
-    public function handle(\Throwable $exception, \Closure $statusCode): array
+    public function handle(Throwable $exception, Closure $statusCode): array
     {
 		$this->autoHandle($exception, $statusCode);
         return $this->process($exception, $statusCode);

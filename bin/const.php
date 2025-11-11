@@ -3,6 +3,9 @@
 /**
  * 应用模式:多终端模式
  */
+
+use pms\exception\WarningException;
+
 const HTTP_APP_MODE_MULTIPLE = 'multiple';
 
 /**
@@ -27,5 +30,5 @@ function HttpCustomErrorHandler($errno, $errstr, $errfile, int $errline){
         // 这个错误代码未被包含在 error_reporting 中
         return;
     }
-    throw new \pms\exception\WarningException($errno, $errstr, $errfile, $errline);
+    throw new WarningException($errno, $errstr, $errfile, $errline);
 }

@@ -21,6 +21,7 @@ use pms\inject\HttpRouteInject;
 use pms\interpreter\http\sandbox\HttpRoute;
 use pms\program\boot\Options;
 use ReflectionClass;
+use Throwable;
 
 
 class Sandbox extends Container
@@ -77,7 +78,7 @@ class Sandbox extends Container
             $this->putInject();
 
             return $this->execute();
-        } catch (\Throwable $e) {
+        } catch (Throwable $e) {
             // 跳过php系统内部异常，转交给 register_shutdown_function
             $error = error_get_last();
             if($error === null || $error['type'] !== E_WARNING){
@@ -108,7 +109,7 @@ class Sandbox extends Container
             try {
                 $this->response->header('Content-Type', mime_content_type($filePath));
                 $this->response->end(file_get_contents($filePath));
-            } catch (\Throwable $e) {
+            } catch (Throwable $e) {
                 $this->response->status(404);
                 $this->response->end();
             }
@@ -301,11 +302,11 @@ class Sandbox extends Container
 
     /**
      * 加载异常处理器
-     * @param \Throwable $e
+     * @param Throwable $e
      * @param bool $inUser 是否使用应用内客制化处理器
      * @return void
      */
-    protected function exceptionHandle(\Throwable $e, bool $inUser = true): void
+    protected function exceptionHandle(Throwable $e, bool $inUser = true): void
     {
         try {
             if (!($e instanceof CliModeForcedInterruptException)) {
@@ -336,7 +337,7 @@ class Sandbox extends Container
                 $this->response->setStatusCode(500);
                 $this->response->end('');
             }
-        } catch (\Throwable $e) {
+        } catch (Throwable $e) {
             // 如果客制化Handle异常，则抛出系统的异常
             $this->exceptionHandle($e, false);
         }

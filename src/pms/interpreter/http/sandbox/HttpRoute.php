@@ -157,7 +157,6 @@ class HttpRoute extends OptionsAccess implements HttpRouteInject
 			$namespace = $this->generateInterfaceNamespace($this->app, $this->terminal, $this->interface);
 			$this->interfaceClass = $namespace;
         }
-        return;
     }
 
 

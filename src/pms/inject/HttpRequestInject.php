@@ -21,6 +21,8 @@ interface HttpRequestInject {
     public function ip(): string;
     public function scheme(): string;
     public function host(): string;
+	public function domain(): string;
+	public function builder(string|array $path=""): string;
     public function pathinfo(): string;
     public function isHttps(): bool;
     public function isAjax(): bool;

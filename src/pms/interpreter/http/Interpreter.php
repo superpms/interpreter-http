@@ -6,24 +6,25 @@ use pms\facade\Path;
 use pms\hook\HttpLifecycleHook;
 use pms\interpreter\http\sandbox\HttpRequest;
 use pms\interpreter\http\sandbox\HttpResponse;
+use pms\program\boot\Options;
 
 class Interpreter extends InterpreterApp{
 
     protected static string $name = 'http-web server';
 
-    public static function run(\pms\program\boot\Options $bootOptions): bool
+    public static function entry(Options $bootOptions): bool
     {
         HttpLifecycleHook::run(LIFECYCLE_BOOT);
         Path::mount('WebRoot', Path::getRoot(config('http.web_root','/public')));
         HttpLifecycleHook::run(LIFECYCLE_BOOTED);
-
         $request = new HttpRequest();
         $response = new HttpResponse();
         self::customShutDownHandler($response,$bootOptions);
+		HttpLifecycleHook::run(LIFECYCLE_SERVER_BOOTED);
         return (new Sandbox($request,$response,$bootOptions))->run();
     }
 
-    public static function customShutDownHandler(HttpResponse $response,\pms\program\boot\Options $bootOptions): void{
+    public static function customShutDownHandler(HttpResponse $response, Options $bootOptions): void{
         register_shutdown_function(function ()use($response,$bootOptions) {
             $error = error_get_last();
             if (!empty($error)) {
