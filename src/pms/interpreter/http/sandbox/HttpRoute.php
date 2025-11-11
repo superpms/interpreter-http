@@ -85,7 +85,6 @@ class HttpRoute extends OptionsAccess implements HttpRouteInject
         }
     }
 
-
     protected function calcInStatic(): void
     {
         $static = config('http.static',[]);
@@ -96,19 +95,9 @@ class HttpRoute extends OptionsAccess implements HttpRouteInject
     }
 
     protected function calcInApp(): void{
-        $apps = config('http.app.provide',[]);
-        if (is_string($apps)) {
-            $apps = [$apps];
-        }
-        $realApp = [];
-        foreach ($apps as $key => $value){
-            if(is_string($key)){
-                $realApp[] = $key;
-            }else if(is_string($value)){
-                $realApp[] = $value;
-            }
-        }
-        $this->inApp = in_array($this->app, $realApp);
+		$cfg = config('http.app.provide',[]);
+        $apps = is_array($cfg) ? $cfg : [$cfg];
+        $this->inApp = in_array($this->app, $apps);
     }
 
     protected function calcInTerminal(): void{
@@ -147,29 +136,27 @@ class HttpRoute extends OptionsAccess implements HttpRouteInject
     protected function constructInterface(): void
     {
         HttpRouter::load($this->app);
-        $namespace = HttpRouter::findClass($this->pathinfo,[
+		$this->interfaceClass = HttpRouter::findClass($this->pathinfo,[
             'app' => $this->app,
             'terminal' => $this->terminal,
         ]);
-        if($namespace !== null){
-            $this->interfaceClass = $namespace;
-            return;
+        if($this->interfaceClass === null){
+			$namespaceTerminal = HttpRouter::findTerminalAlias($this->app,$this->terminal,[
+				'app' => $this->app,
+				'terminal' => $this->terminal,
+			]);
+			if(!empty($namespaceTerminal)){
+				foreach ($namespaceTerminal as $terminal){
+					$namespace = $this->generateInterfaceNamespace($this->app, $terminal, $this->interface);
+					if(class_exists($namespace)){
+						$this->interfaceClass = $namespace;
+						return;
+					}
+				}
+			}
+			$namespace = $this->generateInterfaceNamespace($this->app, $this->terminal, $this->interface);
+			$this->interfaceClass = $namespace;
         }
-        $namespaceTerminal = HttpRouter::findTerminalAlias($this->app,$this->terminal,[
-            'app' => $this->app,
-            'terminal' => $this->terminal,
-        ]);
-        if(!empty($namespaceTerminal)){
-            foreach ($namespaceTerminal as $terminal){
-                $namespace = $this->generateInterfaceNamespace($this->app, $terminal, $this->interface);
-                if(class_exists($namespace)){
-                    $this->interfaceClass = $namespace;
-                    return;
-                }
-            }
-        }
-        $namespace = $this->generateInterfaceNamespace($this->app, $this->terminal, $this->interface);
-        $this->interfaceClass = $namespace;
         return;
     }
 

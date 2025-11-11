@@ -124,7 +124,8 @@ class Driver
 
     protected function _findTerminalAlias($currentApp, $currentTerminal, $option = []): ?array
     {
-        if (!empty($option)) {
+		$current = $currentApp . '/' . $currentTerminal;
+        if (!empty($option) && !isset($this->terminalAliasContainer[$current])) {
             foreach ($this->terminalAliasContainer as $alias => $terminalList) {
                 foreach ($option as $key => $value) {
                     $templateFieldKey = strtoupper('TEMPLATE_' . $key);
@@ -134,38 +135,16 @@ class Driver
                 $this->terminalAliasContainer[$alias] = $terminalList;
             }
         }
-        $current = $currentApp . '/' . $currentTerminal;
         if (!isset($this->terminalAliasContainer[$current])) {
             return null;
         }
-        $currentAlias = $this->terminalAliasContainer[$current];
+        $currentAlias = $this->terminalAliasContainer[$current] ?? null;
         if (empty($currentAlias)) {
             return null;
         }
         return array_reverse($currentAlias);
     }
 
-    protected function createInterfaceNamespace(bool $stm, string $app,string $terminal, string $interface): string
-    {
-        $packageName = config('http.structure.package', 'http');
-        if ($stm) {
-            return join("\\", [
-                '',
-                'app',
-                $app,
-                $packageName,
-                $interface
-            ]);
-        }
-        return join("\\", [
-            '',
-            'app',
-            $app,
-            $terminal,
-            $packageName,
-            $interface
-        ]);
-    }
 
     /**
      * 查找指定路径对应的处理类
@@ -176,7 +155,7 @@ class Driver
      */
     protected function _findClass(string $path, array $option = []): ?string
     {
-        if (!empty($option)) {
+        if (!empty($option) && !array_key_exists($path, $this->container)) {
             foreach ($this->container as $router => $item) {
                 foreach ($option as $key => $value) {
                     $templateFieldKey = strtoupper('TEMPLATE_' . $key);
