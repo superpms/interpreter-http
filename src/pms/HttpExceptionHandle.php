@@ -3,9 +3,9 @@
 namespace pms;
 
 use pms\exception\ClassNotFoundException;
+use pms\exception\ErrorException;
 use pms\exception\FuncNotFoundException;
 use pms\exception\SystemException;
-use pms\exception\WarningException;
 use pms\inject\HttpResponseInject;
 use Closure;
 use Throwable;
@@ -19,7 +19,7 @@ class HttpExceptionHandle
      */
     private array $handleCodeMap = [
         SystemException::class => 501,
-        WarningException::class => 502,
+        ErrorException::class => 502,
         ClassNotFoundException::class => 504,
         FuncNotFoundException::class => 504,
     ];
@@ -56,6 +56,7 @@ class HttpExceptionHandle
 
     final public function __construct(bool $debug, Throwable $exception, Closure $statusCode)
     {
+
         $this->debug = $debug;
         $this->defaultSet();
         $this->content = $this->handle($exception, $statusCode);
@@ -65,7 +66,7 @@ class HttpExceptionHandle
     {
         $this->setHandleCode([
             SystemException::class,
-            WarningException::class
+            ErrorException::class
         ], 500, function (Throwable $exception, Closure $statusCode) {
             $statusCode(500);
             if (!$this->debug) {
@@ -94,15 +95,19 @@ class HttpExceptionHandle
 
     final protected function process(Throwable $exception, Closure $statusCode): array
 	{
+
         $result = [
             'message' => '系统内部错误'
         ];
+
         if (isset($this->handleCodeMap[$exception::class])) {
             $result['code'] = $this->handleCodeMap[$exception::class];
         } else {
+
             $statusCode(500);
             $result['code'] = 500;
         }
+
         if (isset($this->handleCodeMap[$exception::class]) || $this->debug) {
             if (method_exists($exception, "getMessage")) {
                 $result['message'] = $exception->getMessage();
@@ -123,6 +128,7 @@ class HttpExceptionHandle
                 $result['traceAsString'] = $exception->getTraceAsString();
             }
         }
+
         if (isset($this->handleClosure[$exception::class])) {
             $res = $this->handleClosure[$exception::class]($exception, $statusCode);
             if (!empty($res)) {
@@ -143,7 +149,9 @@ class HttpExceptionHandle
 	
     public function handle(Throwable $exception, Closure $statusCode): array
     {
+
 		$this->autoHandle($exception, $statusCode);
+
         return $this->process($exception, $statusCode);
     }
 }

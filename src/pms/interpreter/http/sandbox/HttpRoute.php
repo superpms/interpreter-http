@@ -2,17 +2,16 @@
 
 namespace pms\interpreter\http\sandbox;
 
+use pms\facade\BootOptions;
 use pms\facade\HttpRouter;
 use pms\HttpExceptionHandle;
 use pms\inject\HttpRouteInject;
 use pms\OptionsAccess;
-use pms\program\boot\Options;
 
 class HttpRoute extends OptionsAccess implements HttpRouteInject
 {
 
-
-    public function __construct(string $pathinfo,protected Options $bootOptions){
+    public function __construct(string $pathinfo){
         parent::__construct();
         $this->interfaceClass = null;
         $this->pathinfo = $pathinfo;
@@ -108,17 +107,18 @@ class HttpRoute extends OptionsAccess implements HttpRouteInject
 
     public function exceptionClass(){
         $name = config('http.exception.app','HttpExceptionHandle');
+        $app = BootOptions::get_dir_app();
         if($this->isStm){
             $customizedHandle = join("\\",[
                 "",
-                trim($this->bootOptions->dir_app,'/'),
+                trim($app,'/'),
                 $this->app,
                 $name,
             ]);
         }else{
             $customizedHandle = join("\\",[
                 "",
-                trim($this->bootOptions->dir_app,'/'),
+                trim($app,'/'),
                 $this->app,
                 $this->terminal,
                 $name,

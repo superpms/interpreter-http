@@ -24,7 +24,7 @@ class HttpRequest implements HttpRequestInject
 	protected string $contentType;
 	protected array $attach = [];
 	
-	public function server(string $name = null, mixed $default = null): array|string|null
+	public function server(?string $name = null, mixed $default = null): array|string|null
 	{
 		if ($name === null) {
 			return $this->server;
@@ -32,7 +32,7 @@ class HttpRequest implements HttpRequestInject
 		return $this->server[strtoupper($name)] ?? $this->server[$name] ?? $this->server[strtolower($name)] ?? $default;
 	}
 	
-	public function header(string $name = null, mixed $default = null): array|string|null
+	public function header(?string $name = null, mixed $default = null): array|string|null
 	{
 		if ($name === null) {
 			return $this->header;
@@ -40,7 +40,7 @@ class HttpRequest implements HttpRequestInject
 		return $this->header[$name] ?? $this->header[strtolower($name)] ?? $this->header[strtoupper($name)] ?? $default;
 	}
 	
-	public function params(string $name = null, mixed $default = null): mixed
+	public function params(?string $name = null, mixed $default = null): mixed
 	{
 		if ($name === null) {
 			return $this->params;
@@ -48,7 +48,7 @@ class HttpRequest implements HttpRequestInject
 		return $this->params[$name] ?? $default;
 	}
 	
-	public function cookie(string $name = null, mixed $default = null): array|string|null
+	public function cookie(?string $name = null, mixed $default = null): array|string|null
 	{
 		if ($name === null) {
 			return $this->cookie;
@@ -56,7 +56,7 @@ class HttpRequest implements HttpRequestInject
 		return $this->cookie[$name] ?? $default;
 	}
 	
-	public function files(string $name = null, mixed $default = null): mixed
+	public function files(?string $name = null, mixed $default = null): mixed
 	{
 		if ($name === null) {
 			return $this->files;
@@ -64,7 +64,7 @@ class HttpRequest implements HttpRequestInject
 		return $this->files[$name] ?? $default;
 	}
 	
-	public function post(string $name = null, mixed $default = null): array|string|null
+	public function post(?string $name = null, mixed $default = null): array|string|null
 	{
 		if ($name === null) {
 			return $this->post;
@@ -72,7 +72,7 @@ class HttpRequest implements HttpRequestInject
 		return $this->post[$name] ?? $default;
 	}
 	
-	public function get(string $name = null, mixed $default = null): array|string|null
+	public function get(?string $name = null, mixed $default = null): array|string|null
 	{
 		if ($name === null) {
 			return $this->get;

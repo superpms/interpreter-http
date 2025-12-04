@@ -6,6 +6,7 @@ use pms\app\HttpApp;
 use pms\contract\AppInterface;
 use pms\app\HttpMiddlewareApp;
 use pms\Container;
+use pms\facade\BootOptions;
 use pms\facade\Config;
 use pms\hook\HttpLifecycleHook;
 use pms\HttpExceptionHandle;
@@ -19,7 +20,6 @@ use pms\exception\CliModeForcedInterruptException;
 use pms\facade\Path;
 use pms\inject\HttpRouteInject;
 use pms\interpreter\http\sandbox\HttpRoute;
-use pms\program\boot\Options;
 use ReflectionClass;
 use Throwable;
 
@@ -29,34 +29,32 @@ class Sandbox extends Container
     protected HttpRequestInject $request;
     protected HttpResponseInject $response;
     protected HttpRouteInject $route;
-    protected Options $bootOptions;
     protected array $middlewares = [];
     protected string $contentType = JSON_CONTENT_TYPE;
 
 
-    public function __construct(HttpRequestInject $request, HttpResponseInject $response, Options $bootOptions)
+    public function __construct(HttpRequestInject $request, HttpResponseInject $response)
     {
         $this->request = $request;
         $this->response = $response;
-        $this->bootOptions = $bootOptions;
     }
 
     public function run(): mixed
     {
+        $this->initCors();
         try {
-            $this->route = new HttpRoute($this->request->pathinfo(),$this->bootOptions);
-            $this->initCors();
+            set_error_handler('HttpCustomErrorHandler');
+            $this->route = new HttpRoute($this->request->pathinfo());
             if ($this->request->isOptions()) {
                 $this->response->end();
                 return true;
             }
-            set_error_handler('HttpCustomErrorHandler');
             HttpLifecycleHook::run(LIFECYCLE_SANDBOX_CREATED,
                 $this->request,
                 $this->response,
                 $this->route,
-                $this->bootOptions
             );
+
             if($this->route->inStatic){
                 $this->sendFile($this->request->pathinfo());
                 return true;
@@ -76,7 +74,6 @@ class Sandbox extends Container
             $this->request->init();
             $this->route->activate();
             $this->putInject();
-
             return $this->execute();
         } catch (Throwable $e) {
             // 跳过php系统内部异常，转交给 register_shutdown_function
@@ -91,8 +88,7 @@ class Sandbox extends Container
         }
     }
 
-    protected function initCors(): void
-    {
+    protected function initCors(): void{
         $responseHeader = config('http.cors', []);
         foreach ($responseHeader as $key => $value) {
             if (is_array($value)) {
@@ -160,7 +156,7 @@ class Sandbox extends Container
             $interpreterConfigPath,
             $interpreterAppConfigPath,
             $appConfigPath
-        ]);
+        ],true);
     }
 
 
@@ -178,12 +174,13 @@ class Sandbox extends Container
             // 执行接口独立中间件
             ...$interfaceClass->getProperty('middleware')->getDefaultValue(),
         ]);
+
         foreach ($this->middlewares as $item) {
+
             $this->runMiddleware($item, [
                 $this->request,
                 $this->response,
                 $this->route,
-                $this->bootOptions,
                 $interfaceClass,
             ]);
         }
@@ -231,19 +228,18 @@ class Sandbox extends Container
         if (!class_exists($this->route->interfaceClass)) {
             throw new ClassNotFoundException($this->route->interfaceClass);
         }
+
         $class = $this->getClass($this->route->interfaceClass);
         if (!$class->isSubclassOf(HttpApp::class)) {
             throw new ClassNotFoundException($this->route->interfaceClass);
         }
         $this->contentType = $class->getProperty('contentType')->getDefaultValue();
-
         $this->initInterpreterConfig();
 
         HttpLifecycleHook::run(LIFECYCLE_SANDBOX_BOOT,
             $this->request,
             $this->response,
             $this->route,
-            $this->bootOptions,
             $class
         );
 
@@ -254,13 +250,11 @@ class Sandbox extends Container
         $obj = $this->invokeClass($class);
         $obj->app = $this->route->app;
         $obj->terminal = $this->route->terminal;
-        $obj->bootOptions = $this->bootOptions;
 
         HttpLifecycleHook::run(LIFECYCLE_SANDBOX_BOOTED,
             $this->request,
             $this->response,
             $this->route,
-            $this->bootOptions,
             $class,
             $obj
         );
@@ -315,17 +309,20 @@ class Sandbox extends Container
                 } else {
                     $handleClass = HttpExceptionHandle::class;
                 }
+
                 $class = $this->getClass($handleClass);
+
                 /**
                  * @var HttpExceptionHandle $obj
                  */
                 $obj = $this->invokeClass($class, [
-                    $this->bootOptions->error_debug,
+                    BootOptions::get_error_debug(),
                     $e,
                     function ($code) {
                         $this->response->status($code);
                     }
                 ]);
+
                 $content = $obj->getContent();
                 $result = $this->contentToString($content, $this->contentType);
                 if ($result === false) {
@@ -338,7 +335,6 @@ class Sandbox extends Container
                 $this->response->end('');
             }
         } catch (Throwable $e) {
-            // 如果客制化Handle异常，则抛出系统的异常
             $this->exceptionHandle($e, false);
         }
 

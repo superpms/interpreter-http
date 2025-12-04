@@ -7,12 +7,10 @@ use pms\contract\AppInterface;
 use pms\inject\HttpRequestInject;
 use pms\inject\HttpResponseInject;
 use pms\interpreter\http\sandbox\HttpRoute;
-use pms\program\boot\Options;
 use ReflectionClass;
 
 abstract class HttpMiddlewareApp implements AppInterface
 {
-
 
     protected string $app;
     protected string $terminal;
@@ -23,8 +21,7 @@ abstract class HttpMiddlewareApp implements AppInterface
         protected HttpRequestInject $request,
         protected HttpResponseInject $response,
         protected HttpRoute $route,
-        protected Options           $bootOptions,
-        protected ReflectionClass   $class,
+        protected ReflectionClass   $class
     )
     {
         $this->app = $this->route->app;
