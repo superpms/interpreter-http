@@ -12,7 +12,6 @@ InterpreterHook::mount(
 
 if(class_exists('pms\hook\TerminalCommandHook')){
     TerminalCommandHook::mount(
-        'dev-http-server',
         program\http\DevHttpServerCommand::class
     );
 }

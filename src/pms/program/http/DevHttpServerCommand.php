@@ -8,7 +8,7 @@ use pms\inject\TerminalInputInject;
 use pms\inject\TerminalOutputInject;
 
 class DevHttpServerCommand extends TerminalCommandApp{
-    protected string $name = "PHP Built-in Server";
+    protected string $name = "dev-http-server";
     protected string $description = "运行PHP内置服务器";
     protected array $validate = [
         'host'=>[
