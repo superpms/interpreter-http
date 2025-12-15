@@ -24,7 +24,7 @@ interface HttpRouteInject
     /**
      * 路由转发
      * @param string $forwardClass 转发目标类名
-     * @return mixed
+     * @return HttpRouteCoroutine
      */
     public function forward(string $forwardClass): HttpRouteCoroutine;
 
