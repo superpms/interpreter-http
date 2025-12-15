@@ -16,11 +16,14 @@ class HttpRouteCoroutine
         return $this;
     }
 
-    public function getResult(string $class): mixed
+    public function getResult(?string $class=null): mixed
     {
         $name = static::class . "__result__";
         $resultRaw = Ctx::get($name,[]);
-        return $resultRaw[$class] ?? null;
+        if($class === null){
+            return $resultRaw[$class] ?? null;
+        }
+        return $resultRaw;
     }
 
     public function listener(string $event, callable $listener): static
