@@ -48,4 +48,15 @@ class HttpRouteCoroutine
         return $this;
     }
 
+    public function set(string $key, mixed $value): static
+    {
+        Ctx::set($key, $value);
+        return $this;
+    }
+
+    public function get(string $key, mixed $default = null): mixed
+    {
+        return Ctx::get($key,$default);
+    }
+
 }
