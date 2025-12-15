@@ -2,18 +2,35 @@
 
 namespace pms\interpreter\http\sandbox;
 
+use pms\exception\SystemException;
 use pms\facade\BootOptions;
 use pms\facade\HttpRouter;
 use pms\HttpExceptionHandle;
+use pms\inject\HttpRequestInject;
+use pms\inject\HttpResponseInject;
 use pms\inject\HttpRouteInject;
+use pms\interpreter\http\Sandbox;
 use pms\OptionsAccess;
+use pms\program\httpRoute\HttpRouteCoroutine;
 
 class HttpRoute extends OptionsAccess implements HttpRouteInject
 {
 
-    public function __construct(string $pathinfo){
-        parent::__construct();
-        $this->interfaceClass = null;
+    protected ?HttpRequestInject $request = null;
+    protected ?HttpResponseInject $response = null;
+
+    protected bool $isForward = false;
+
+
+    public function __construct(string $pathinfo,?string $forward = null){
+        parent::__construct(false);
+        if($forward !== null){
+            $this->isForward = true;
+            $this->interfaceClass = $forward;
+        }else{
+            $this->interfaceClass = null;
+        }
+
         $this->pathinfo = $pathinfo;
         $this->app = config('http.app.default.app', 'index');
         $this->terminal = config('http.app.default.terminal', 'index');
@@ -29,10 +46,14 @@ class HttpRoute extends OptionsAccess implements HttpRouteInject
 
     /**
      * 激活
+     * @param HttpRequestInject  $request
+     * @param HttpResponseInject $response
      * @return void
      */
-    public function activate(): void
+    public function activate( HttpRequestInject $request, HttpResponseInject $response): void
     {
+        $this->request = $request;
+        $this->response = $response;
         $this->constructInterface();
     }
 
@@ -135,6 +156,9 @@ class HttpRoute extends OptionsAccess implements HttpRouteInject
 
     protected function constructInterface(): void
     {
+        if($this->isForward){
+            return;
+        }
         HttpRouter::load($this->app);
 		$this->interfaceClass = HttpRouter::findClass($this->pathinfo,[
             'app' => $this->app,
@@ -188,6 +212,40 @@ class HttpRoute extends OptionsAccess implements HttpRouteInject
                 $this->_constructInterface();
         }
     }
+
+
+    protected ?HttpRouteCoroutine $ForwardCoroutine = null;
+
+    /**
+     * 获取路由协程容器
+     * @return HttpRouteCoroutine
+     */
+    public function getCoroutine(): HttpRouteCoroutine
+    {
+        if($this->ForwardCoroutine === null){
+            $this->ForwardCoroutine = new HttpRouteCoroutine();
+        }
+        return $this->ForwardCoroutine;
+    }
+
+    /**
+     * 路由转发
+     * @param string $forwardClass 转发目标类名
+     * @return HttpRouteCoroutine
+     */
+    public function forward(string $forwardClass): HttpRouteCoroutine
+    {
+        if($this->request === null || $this->response === null){
+            throw new SystemException('当前路由未激活,无法使用路由转发');
+        }
+        $forwardCoroutine = $this->getCoroutine();
+        $forwardCoroutine->pushResult(
+            $forwardClass,
+            (new Sandbox($this->request, $this->response))->run($forwardClass)
+        );
+        return $forwardCoroutine;
+    }
+
 
 
 }

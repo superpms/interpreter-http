@@ -28,7 +28,6 @@ class Interpreter extends InterpreterApp
         HttpLifecycleHook::run(LIFECYCLE_BOOTED);
         HttpLifecycleHook::run(LIFECYCLE_SERVER_BOOTED);
         (new Sandbox($request, $response))->run();
-
         return true;
     }
 

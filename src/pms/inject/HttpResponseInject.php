@@ -5,6 +5,7 @@ namespace pms\inject;
 interface HttpResponseInject
 {
     /**
+     * 当前 Response 是否可书写
      * 判断 Response 对象是否已结束 (end) 或已分离 (detach)。
      * @return bool
      */

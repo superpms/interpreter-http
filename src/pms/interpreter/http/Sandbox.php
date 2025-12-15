@@ -32,6 +32,10 @@ class Sandbox extends Container
     protected array $middlewares = [];
     protected string $contentType = JSON_CONTENT_TYPE;
 
+    /**
+     * @var bool 当前是否为转发请求
+     */
+    protected bool $isForward = false;
 
     public function __construct(HttpRequestInject $request, HttpResponseInject $response)
     {
@@ -39,46 +43,57 @@ class Sandbox extends Container
         $this->response = $response;
     }
 
-    public function run(): mixed
+    public function run(?string $forward = null): mixed
     {
+        if ($forward !== null) {
+            $this->isForward = true;
+        }
+
         $this->initCors();
         try {
-            set_error_handler('HttpCustomErrorHandler');
-            $this->route = new HttpRoute($this->request->pathinfo());
-            if ($this->request->isOptions()) {
-                $this->response->end();
-                return true;
-            }
-            HttpLifecycleHook::run(LIFECYCLE_SANDBOX_CREATED,
-                $this->request,
-                $this->response,
-                $this->route,
-            );
 
-            if($this->route->inStatic){
-                $this->sendFile($this->request->pathinfo());
-                return true;
+            if (!$this->isForward) {
+                set_error_handler('HttpCustomErrorHandler');
             }
 
-            if (!$this->route->inApp) {
-                $this->response->status(500,"Gateway Not Found");
-                $this->response->end('Gateway Not Found');
-                return true;
+            $this->route = new HttpRoute($this->request->pathinfo(),$forward);
+
+            if (!$this->isForward) {
+                if ($this->request->isOptions()) {
+                    $this->response->end();
+                    return true;
+                }
+                HttpLifecycleHook::run(LIFECYCLE_SANDBOX_CREATED,
+                    $this->request,
+                    $this->response,
+                    $this->route,
+                );
+                if ($this->route->inStatic) {
+                    $this->sendFile($this->request->pathinfo());
+                    return true;
+                }
+                if (!$this->route->inApp) {
+                    $this->response->status(500, "Gateway Not Found");
+                    $this->response->end('Gateway Not Found');
+                    return true;
+                }
+
+                if (!$this->route->inTerminal) {
+                    $this->response->status(500, "Gateway Not Found");
+                    $this->response->end('Gateway Not Found');
+                    return true;
+                }
+                $this->request->init();
             }
 
-            if (!$this->route->inTerminal) {
-                $this->response->status(500,"Gateway Not Found");
-                $this->response->end('Gateway Not Found');
-                return true;
-            }
-            $this->request->init();
-            $this->route->activate();
+            $this->route->activate($this->request, $this->response);
+
             $this->putInject();
             return $this->execute();
         } catch (Throwable $e) {
             // 跳过php系统内部异常，转交给 register_shutdown_function
             $error = error_get_last();
-            if($error === null || $error['type'] !== E_WARNING){
+            if ($error === null || $error['type'] !== E_WARNING) {
                 if ($this->response->isWritable()) {
                     $this->response->header('Content-Type', $this->contentType);
                     $this->exceptionHandle($e);
@@ -88,7 +103,11 @@ class Sandbox extends Container
         }
     }
 
-    protected function initCors(): void{
+    protected function initCors(): void
+    {
+        if ($this->isForward) {
+            return;
+        }
         $responseHeader = config('http.cors', []);
         foreach ($responseHeader as $key => $value) {
             if (is_array($value)) {
@@ -156,7 +175,7 @@ class Sandbox extends Container
             $interpreterConfigPath,
             $interpreterAppConfigPath,
             $appConfigPath
-        ],true);
+        ], true);
     }
 
 
@@ -190,7 +209,7 @@ class Sandbox extends Container
     /**
      * 执行中间件
      * @param string $middlewares
-     * @param array $args
+     * @param array  $args
      * @return void
      */
     protected function runMiddleware(string $middlewares, array $args): void
@@ -216,15 +235,16 @@ class Sandbox extends Container
             return $result;
         }
         return match ($contentType) {
-            JSON_CONTENT_TYPE => json_encode($result, 320),
+            JSON_CONTENT_TYPE  => json_encode($result, 320),
             JSONP_CONTENT_TYPE => $this->request->get('callback', 'callback') . '(' . json_encode($result) . ')',
-            XML_CONTENT_TYPE => array_to_xml($result),
-            default => is_array($result) || is_object($result) ? json_encode($result, 320) : $result,
+            XML_CONTENT_TYPE   => array_to_xml($result),
+            default            => is_array($result) || is_object($result) ? json_encode($result, 320) : $result,
         };
     }
 
     protected function execute()
     {
+
         if (!class_exists($this->route->interfaceClass)) {
             throw new ClassNotFoundException($this->route->interfaceClass);
         }
@@ -236,12 +256,14 @@ class Sandbox extends Container
         $this->contentType = $class->getProperty('contentType')->getDefaultValue();
         $this->initInterpreterConfig();
 
-        HttpLifecycleHook::run(LIFECYCLE_SANDBOX_BOOT,
-            $this->request,
-            $this->response,
-            $this->route,
-            $class
-        );
+        if(!$this->isForward){
+            HttpLifecycleHook::run(LIFECYCLE_SANDBOX_BOOT,
+                $this->request,
+                $this->response,
+                $this->route,
+                $class
+            );
+        }
 
         $this->middleware($class);
         /**
@@ -251,13 +273,16 @@ class Sandbox extends Container
         $obj->app = $this->route->app;
         $obj->terminal = $this->route->terminal;
 
-        HttpLifecycleHook::run(LIFECYCLE_SANDBOX_BOOTED,
-            $this->request,
-            $this->response,
-            $this->route,
-            $class,
-            $obj
-        );
+        if(!$this->isForward){
+            HttpLifecycleHook::run(LIFECYCLE_SANDBOX_BOOTED,
+                $this->request,
+                $this->response,
+                $this->route,
+                $class,
+                $obj
+            );
+        }
+
 
         if (method_exists($obj, '__prepare')) {
             $obj->__prepare();
@@ -267,29 +292,32 @@ class Sandbox extends Container
          * @var $obj AppInterface
          */
         $result = $obj->entry();
-        if ($result === null) {
-            $result = $class->getProperty('resRaw')->getValue($obj);
-        }
-        $this->contentType = $class->getProperty('contentType')->getValue($obj);
+
         if (method_exists($obj, '__teardown')) {
             $obj->__teardown();
         }
 
-        if ($this->response->isWritable()) {
-            $result = $this->contentToString($result, $this->contentType);
-            $this->response->header('Content-Type', $this->contentType);
-            $this->response->end($result);
+        if ($result === null && $class->hasProperty('resRaw')) {
+            $result = $class->getProperty('resRaw')->getValue($obj);
         }
-
-        HttpLifecycleHook::run(LIFECYCLE_SANDBOX_RAN,
-            $this->request,
-            $this->response,
-            $this->route,
-            $this->bootOptions,
-            $class,
-            $obj,
-            $result
-        );
+        if(!$this->isForward){
+            if($class->hasProperty('contentType')){
+                $this->contentType = $class->getProperty('contentType')->getValue($obj);
+            }
+            if ($this->response->isWritable()) {
+                $result = $this->contentToString($result, $this->contentType);
+                $this->response->header('Content-Type', $this->contentType);
+                $this->response->end($result);
+            }
+            HttpLifecycleHook::run(LIFECYCLE_SANDBOX_RAN,
+                $this->request,
+                $this->response,
+                $this->route,
+                $class,
+                $obj,
+                $result
+            );
+        }
         return $result;
     }
 
@@ -297,7 +325,7 @@ class Sandbox extends Container
     /**
      * 加载异常处理器
      * @param Throwable $e
-     * @param bool $inUser 是否使用应用内客制化处理器
+     * @param bool      $inUser 是否使用应用内客制化处理器
      * @return void
      */
     protected function exceptionHandle(Throwable $e, bool $inUser = true): void
