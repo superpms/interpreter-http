@@ -272,7 +272,7 @@ class Sandbox extends Container
         $obj = $this->invokeClass($class);
         $obj->app = $this->route->app;
         $obj->terminal = $this->route->terminal;
-
+        $obj->inForward = $this->isForward;
         if(!$this->isForward){
             HttpLifecycleHook::run(LIFECYCLE_SANDBOX_BOOTED,
                 $this->request,

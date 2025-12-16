@@ -30,6 +30,12 @@ abstract class HttpApp implements AppInterface
     public string $app;
 
     /**
+     * @var bool 当前是否处于转发子请求内
+     */
+    public bool $inForward = false;
+
+
+    /**
      * @var string 当前终端名称
      */
     public string $terminal;
