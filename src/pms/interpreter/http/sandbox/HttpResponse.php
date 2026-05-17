@@ -132,35 +132,48 @@ class HttpResponse implements HttpResponseInject
 
     public function sendfile(string $filename, int $offset = 0, int $length = 0): bool
     {
-        // 从$offset位置开始读取文件
-        $length = $length === 0 ? filesize($filename) : $length;
-        if (is_file($filename)) {
+        if (!is_file($filename) || !is_readable($filename)) {
             return false;
         }
+        $fileSize = filesize($filename);
+        if ($fileSize === false) {
+            return false;
+        }
+        $offset = max(0, $offset);
+        if ($offset >= $fileSize) {
+            return false;
+        }
+        $length = $length <= 0 ? $fileSize - $offset : min($length, $fileSize - $offset);
         header_remove('Content-Type');
         header('Content-Type: application/octet-stream');
         header_remove('Content-Disposition');
-        header('Content-Disposition: attachment; filename=' . basename($filename));
+        header('Content-Disposition: attachment; filename="' . addcslashes(basename($filename), '"\\') . '"');
         header_remove('Content-Length');
         header_remove('Connection');
         header('Connection: close');
-        if ($offset > 0) {
-            try {
+        header('Content-Length: ' . $length);
+        try {
+            if ($offset > 0 || $length < $fileSize) {
                 $fp = fopen($filename, 'rb');
+                if ($fp === false) {
+                    return false;
+                }
                 fseek($fp, $offset);
-                $content = fread($fp, $length === 0 ? filesize($filename) : $length);
+                $remaining = $length;
+                while ($remaining > 0 && !feof($fp)) {
+                    $chunkSize = min(8192, $remaining);
+                    echo fread($fp, $chunkSize);
+                    $remaining -= $chunkSize;
+                    flush();
+                }
                 fclose($fp);
-                header('Content-Length: ' . ($length === 0 ? strlen($filename) : $length));
-                echo $content;
-            } catch (Throwable $e) {
-                // 处理异常
-                return false;
+            } else {
+                readfile($filename);
             }
-        } else {
-            header('Content-Length: ' . ($length === 0 ? filesize($filename) : $length));
-            readfile($filename);
-
+        } catch (Throwable $e) {
+            return false;
         }
+        $this->end = true;
         return true;
     }
 

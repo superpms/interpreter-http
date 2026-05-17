@@ -122,8 +122,15 @@ class Sandbox extends Container
         $filePath = Path::getWebRoot($pathinfo);
         if (is_file($filePath)) {
             try {
+                $isDownload = (string)$this->request->params('download', '') === '1';
+                if ($isDownload) {
+                    $this->response->sendfile($filePath);
+                    return;
+                }
                 $this->response->header('Content-Type', mime_content_type($filePath));
-                $this->response->end(file_get_contents($filePath));
+                $this->response->header('Content-Length', (string)filesize($filePath));
+                readfile($filePath);
+                $this->response->end();
             } catch (Throwable $e) {
                 $this->response->status(404);
                 $this->response->end();
