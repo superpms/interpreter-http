@@ -12,22 +12,13 @@ interface HttpResponseInject
     public function isWritable():bool;
 
     /**
-     * 设置 HTTP 响应的 cookie 信息。别名 setCookie()。此方法参数与 PHP 的 setcookie 一致。
-     * @param string $name Cookie 的 Key
-     * @param string $value Cookie 的 value
-     * @param int $expires Cookie 的过期时间
-     * @param string $path 规定 Cookie 的服务器路径。
-     * @param string $domain 规定 Cookie 的域名
-     * @param bool $secure 规定是否通过安全的 HTTPS 连接来传输 Cookie
-     * @param bool $httponly 是否允许浏览器的JavaScript访问带有 HttpOnly 属性的 Cookie，true 表示不允许，false 表示允许
-     * @param string $samesite 限制第三方 Cookie，从而减少安全风险，可选值为 Strict，Lax，None
-     * @param string $priority Cookie优先级，当Cookie数量超过规定，低优先级的会先被删除，可选值为 Low，Medium，High
+     * 更新响应头、Cookie、Trailer 属性状态。FPM 模式没有 Swoole 底层属性同步语义，只能返回当前是否可写。
      * @return bool
      */
-    public function cookie(string $name, string $value = '', int $expires = 0, string $path = '/', string $domain = '', bool $secure = false, bool $httponly = false, string $samesite = '', string $priority = ''): bool;
+    public function initHeader(): bool;
 
     /**
-     * 设置 HTTP 响应的 cookie 信息。为 cookie() 的别名。此方法参数与 PHP 的 setcookie 一致。
+     * 设置 HTTP 响应的 cookie 信息。别名 setCookie()。参数对齐 Swoole Response::cookie 的字符串参数集。
      * @param string $name Cookie 的 Key
      * @param string $value Cookie 的 value
      * @param int $expires Cookie 的过期时间
@@ -37,12 +28,13 @@ interface HttpResponseInject
      * @param bool $httponly 是否允许浏览器的JavaScript访问带有 HttpOnly 属性的 Cookie，true 表示不允许，false 表示允许
      * @param string $samesite 限制第三方 Cookie，从而减少安全风险，可选值为 Strict，Lax，None
      * @param string $priority Cookie优先级，当Cookie数量超过规定，低优先级的会先被删除，可选值为 Low，Medium，High
+     * @param bool $partitioned 是否设置 Partitioned 属性
      * @return bool
      */
-    public function setCookie(string $name, string $value = '', int $expires = 0, string $path = '/', string $domain = '', bool $secure = false, bool $httponly = false, string $samesite = '', string $priority = ''): bool;
+    public function cookie(string $name, string $value = '', int $expires = 0, string $path = '/', string $domain = '', bool $secure = false, bool $httponly = false, string $samesite = '', string $priority = '', bool $partitioned = false): bool;
 
     /**
-     * 设置 HTTP 响应的 cookie 信息。并使用 rawurlencode 编码 value。
+     * 设置 HTTP 响应的 cookie 信息。为 cookie() 的别名。参数对齐 Swoole Response::cookie 的字符串参数集。
      * @param string $name Cookie 的 Key
      * @param string $value Cookie 的 value
      * @param int $expires Cookie 的过期时间
@@ -52,9 +44,42 @@ interface HttpResponseInject
      * @param bool $httponly 是否允许浏览器的JavaScript访问带有 HttpOnly 属性的 Cookie，true 表示不允许，false 表示允许
      * @param string $samesite 限制第三方 Cookie，从而减少安全风险，可选值为 Strict，Lax，None
      * @param string $priority Cookie优先级，当Cookie数量超过规定，低优先级的会先被删除，可选值为 Low，Medium，High
+     * @param bool $partitioned 是否设置 Partitioned 属性
      * @return bool
      */
-    public function rawcookie(string $name, string $value = '', int $expires = 0, string $path = '/', string $domain = '', bool $secure = false, bool $httponly = false, string $samesite = '', string $priority = ''): bool;
+    public function setCookie(string $name, string $value = '', int $expires = 0, string $path = '/', string $domain = '', bool $secure = false, bool $httponly = false, string $samesite = '', string $priority = '', bool $partitioned = false): bool;
+
+    /**
+     * 设置 HTTP 响应的 cookie 信息。不对 value 做 urlencode 编码。
+     * @param string $name Cookie 的 Key
+     * @param string $value Cookie 的 value
+     * @param int $expires Cookie 的过期时间
+     * @param string $path 规定 Cookie 的服务器路径。
+     * @param string $domain 规定 Cookie 的域名
+     * @param bool $secure 规定是否通过安全的 HTTPS 连接来传输 Cookie
+     * @param bool $httponly 是否允许浏览器的JavaScript访问带有 HttpOnly 属性的 Cookie，true 表示不允许，false 表示允许
+     * @param string $samesite 限制第三方 Cookie，从而减少安全风险，可选值为 Strict，Lax，None
+     * @param string $priority Cookie优先级，当Cookie数量超过规定，低优先级的会先被删除，可选值为 Low，Medium，High
+     * @param bool $partitioned 是否设置 Partitioned 属性
+     * @return bool
+     */
+    public function rawcookie(string $name, string $value = '', int $expires = 0, string $path = '/', string $domain = '', bool $secure = false, bool $httponly = false, string $samesite = '', string $priority = '', bool $partitioned = false): bool;
+
+    /**
+     * 设置 HTTP 响应的 cookie 信息。为 rawcookie() 的别名。
+     * @param string $name Cookie 的 Key
+     * @param string $value Cookie 的 value
+     * @param int $expires Cookie 的过期时间
+     * @param string $path 规定 Cookie 的服务器路径。
+     * @param string $domain 规定 Cookie 的域名
+     * @param bool $secure 规定是否通过安全的 HTTPS 连接来传输 Cookie
+     * @param bool $httponly 是否允许浏览器的JavaScript访问带有 HttpOnly 属性的 Cookie，true 表示不允许，false 表示允许
+     * @param string $samesite 限制第三方 Cookie，从而减少安全风险，可选值为 Strict，Lax，None
+     * @param string $priority Cookie优先级，当Cookie数量超过规定，低优先级的会先被删除，可选值为 Low，Medium，High
+     * @param bool $partitioned 是否设置 Partitioned 属性
+     * @return bool
+     */
+    public function setRawCookie(string $name, string $value = '', int $expires = 0, string $path = '/', string $domain = '', bool $secure = false, bool $httponly = false, string $samesite = '', string $priority = '', bool $partitioned = false): bool;
 
     /**
      * 发送 Http 状态码。别名 setStatusCode()
@@ -111,9 +136,9 @@ interface HttpResponseInject
      * end 只能调用一次，如果需要分多次向客户端发送数据，请使用 write 方法
      *
      * @param string|null $content 要发送的内容【SwooleHttp请求由于受到 output_buffer_size 的限制，默认为 2M，如果大于这个限制则会响应失败，并抛出错误】
-     * @return mixed
+     * @return bool
      */
-    public function end(?string $content = null): mixed;
+    public function end(?string $content = null): bool;
 
     /**
      * 发送文件到浏览器。
@@ -141,7 +166,7 @@ interface HttpResponseInject
 
     /**
      * 仅SwooleHttp 有效
-     * 构造新的 Swoole\Http\Response 对象。
+     * 构造当前解释器支持的新 Response 对象。
      * @param int|array|object $server
      * @param int $fd
      * @return false|self

@@ -23,8 +23,14 @@ interface HttpRequestInject {
     public function host(): string;
 	public function domain(): string;
 	public function builder(string|array $path=""): string;
-    public function pathinfo(): string;
-    public function isHttps(): bool;
+	public function pathinfo(): string;
+	public function getContent(): string|false;
+	public function rawContent(): string|false;
+	public function getData(): string|false;
+	public function getMethod(): string|false;
+	public function parse(string $data): int|false;
+	public function isCompleted(): bool;
+	public function isHttps(): bool;
     public function isAjax(): bool;
     public function isPjax(): bool;
     public function isPost(): bool;

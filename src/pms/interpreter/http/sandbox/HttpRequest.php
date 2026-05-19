@@ -17,6 +17,7 @@ class HttpRequest implements HttpRequestInject
 	protected array $get = [];
 	protected array $post = [];
 	protected string $input = "";
+	protected bool $inputLoaded = false;
 	protected array $files = [];
 	protected array $cookie = [];
 	protected array $params = [];
@@ -24,7 +25,7 @@ class HttpRequest implements HttpRequestInject
 	protected string $contentType;
 	protected array $attach = [];
 	
-	public function server(?string $name = null, mixed $default = null): array|string|null
+	public function server(?string $name = null, mixed $default = null): mixed
 	{
 		if ($name === null) {
 			return $this->server;
@@ -32,7 +33,7 @@ class HttpRequest implements HttpRequestInject
 		return $this->server[strtoupper($name)] ?? $this->server[$name] ?? $this->server[strtolower($name)] ?? $default;
 	}
 	
-	public function header(?string $name = null, mixed $default = null): array|string|null
+	public function header(?string $name = null, mixed $default = null): mixed
 	{
 		if ($name === null) {
 			return $this->header;
@@ -48,7 +49,7 @@ class HttpRequest implements HttpRequestInject
 		return $this->params[$name] ?? $default;
 	}
 	
-	public function cookie(?string $name = null, mixed $default = null): array|string|null
+	public function cookie(?string $name = null, mixed $default = null): mixed
 	{
 		if ($name === null) {
 			return $this->cookie;
@@ -64,7 +65,7 @@ class HttpRequest implements HttpRequestInject
 		return $this->files[$name] ?? $default;
 	}
 	
-	public function post(?string $name = null, mixed $default = null): array|string|null
+	public function post(?string $name = null, mixed $default = null): mixed
 	{
 		if ($name === null) {
 			return $this->post;
@@ -72,7 +73,7 @@ class HttpRequest implements HttpRequestInject
 		return $this->post[$name] ?? $default;
 	}
 	
-	public function get(?string $name = null, mixed $default = null): array|string|null
+	public function get(?string $name = null, mixed $default = null): mixed
 	{
 		if ($name === null) {
 			return $this->get;
@@ -82,7 +83,46 @@ class HttpRequest implements HttpRequestInject
 	
 	public function input(): string
 	{
+		$content = $this->getContent();
+		return $content === false ? "" : $content;
+	}
+
+	public function getContent(): string|false
+	{
+		if (!$this->inputLoaded) {
+			$content = file_get_contents("php://input");
+			if ($content === false) {
+				return false;
+			}
+			$this->input = $content;
+			$this->inputLoaded = true;
+		}
 		return $this->input;
+	}
+
+	public function rawContent(): string|false
+	{
+		return $this->getContent();
+	}
+
+	public function getData(): string|false
+	{
+		return false;
+	}
+
+	public function getMethod(): string|false
+	{
+		return $this->method();
+	}
+
+	public function parse(string $data): int|false
+	{
+		return false;
+	}
+
+	public function isCompleted(): bool
+	{
+		return true;
 	}
 	
 	public function contentType(): string
@@ -134,12 +174,12 @@ class HttpRequest implements HttpRequestInject
 	
 	public function isAjax(): bool
 	{
-		return strtoupper($this->header('x-requested-with')) === strtoupper('XMLHttpRequest');
+		return strtoupper((string)$this->header('x-requested-with', '')) === 'XMLHTTPREQUEST';
 	}
 	
 	public function isPjax(): bool
 	{
-		return strtoupper($this->header('x-pjax')) === 'TRUE';
+		return strtoupper((string)$this->header('x-pjax', '')) === 'TRUE';
 	}
 	
 	public function isPost(): bool
@@ -195,12 +235,12 @@ class HttpRequest implements HttpRequestInject
 		}
 		$isHttps = false;
 		foreach ($schemeName as $value) {
-			if ($this->header(strtolower($value)) === 'https') {
+			if (strtolower((string)$this->header(strtolower($value), '')) === 'https') {
 				$isHttps = true;
 				break;
 			}
 		}
-		if (!$isHttps && strtoupper($this->server('https', 'off')) === 'ON') {
+		if (!$isHttps && strtoupper((string)$this->server('https', 'off')) === 'ON') {
 			$isHttps = true;
 		}
 		return $isHttps;
@@ -214,14 +254,14 @@ class HttpRequest implements HttpRequestInject
 		}
 		$ip = '';
 		foreach ($ipName as $value) {
-			$t = $this->header(strtolower($value), '');
+			$t = (string)$this->header(strtolower($value), '');
 			if ($t !== '') {
 				$ip = $t;
 				break;
 			}
 		}
 		if ($ip === '') {
-			$ip = $this->server('remote_addr');
+			$ip = (string)$this->server('remote_addr', '');
 		}
 		return $ip;
 	}
@@ -229,8 +269,8 @@ class HttpRequest implements HttpRequestInject
 	final public function __construct(...$args)
 	{
 		$this->platformConstruct(...$args);
-		$this->method = strtoupper($this->server('request_method'));
-		$pathinfo = $this->server('request_uri');
+		$this->method = strtoupper((string)$this->server('request_method', 'GET'));
+		$pathinfo = (string)$this->server('request_uri', '');
 		if (empty($pathinfo)) {
 			$pathinfo = "/";
 		}
@@ -242,7 +282,11 @@ class HttpRequest implements HttpRequestInject
 	
 	protected function platformConstruct(...$args): void
 	{
-		$this->server = $_SERVER;
+		$this->server = [];
+		foreach ($_SERVER as $key => $value) {
+			$this->server[strtolower($key)] = $value;
+		}
+		$this->normalizeServerForSwoole();
 		$headers = [];
 		if (function_exists('getallheaders') && getallheaders() !== false) {
 			foreach (getallheaders() as $key => $value) {
@@ -267,14 +311,16 @@ class HttpRequest implements HttpRequestInject
 		$this->platformInit();
 		$this->isHttps = $this->getIsHttps();
 		$this->ip = $this->getIp();
-		$this->host = $this->header('host');
+		$this->host = (string)$this->header('host', $this->server('server_name', ''));
 		$this->scheme = $this->isHttps ? "https" : "http";
-		$this->contentType = $this->header('content-type', 'text/plain');
-		if (strtolower($this->contentType) === 'application/json' && $this->input !== "") {
+		$this->contentType = (string)$this->header('content-type', 'text/plain');
+		$contentType = strtolower(trim(explode(';', $this->contentType, 2)[0]));
+		if ($contentType === 'application/json' && $this->input !== "") {
 			try {
+				$jsonPost = json_decode($this->input, true);
 				$this->post = [
 					...$this->post,
-					...json_decode($this->input, true)
+					...(is_array($jsonPost) ? $jsonPost : [])
 				];
 			} catch (Throwable $e) {
 				$this->post = [
@@ -292,6 +338,22 @@ class HttpRequest implements HttpRequestInject
 		$this->get = $_GET;
 		$this->post = $_POST;
 		$this->files = $_FILES;
-		$this->input = file_get_contents("php://input");
+		$content = $this->getContent();
+		$this->input = $content === false ? "" : $content;
+	}
+
+	protected function normalizeServerForSwoole(): void
+	{
+		$requestUri = (string)($this->server['request_uri'] ?? '');
+		if ($requestUri === '') {
+			return;
+		}
+		$queryPosition = strpos($requestUri, '?');
+		if ($queryPosition !== false) {
+			$this->server['query_string'] ??= substr($requestUri, $queryPosition + 1);
+			$requestUri = substr($requestUri, 0, $queryPosition);
+			$this->server['request_uri'] = $requestUri;
+		}
+		$this->server['path_info'] ??= $requestUri;
 	}
 }
