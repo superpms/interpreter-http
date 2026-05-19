@@ -235,12 +235,19 @@ class HttpRequest implements HttpRequestInject
 		}
 		$isHttps = false;
 		foreach ($schemeName as $value) {
-			if (strtolower((string)$this->header(strtolower($value), '')) === 'https') {
+			$scheme = strtolower(trim(explode(',', (string)$this->header(strtolower($value), ''), 2)[0]));
+			if ($scheme === 'https') {
 				$isHttps = true;
 				break;
 			}
 		}
+		if (!$isHttps && strtolower(trim(explode(',', (string)$this->header('x-forwarded-proto', ''), 2)[0])) === 'https') {
+			$isHttps = true;
+		}
 		if (!$isHttps && strtoupper((string)$this->server('https', 'off')) === 'ON') {
+			$isHttps = true;
+		}
+		if (!$isHttps && (string)$this->server('server_port', '') === '443') {
 			$isHttps = true;
 		}
 		return $isHttps;
@@ -311,7 +318,7 @@ class HttpRequest implements HttpRequestInject
 		$this->platformInit();
 		$this->isHttps = $this->getIsHttps();
 		$this->ip = $this->getIp();
-		$this->host = (string)$this->header('host', $this->server('server_name', ''));
+		$this->host = (string)$this->header('host', $this->server('http_host', $this->server('server_name', '')));
 		$this->scheme = $this->isHttps ? "https" : "http";
 		$this->contentType = (string)$this->header('content-type', 'text/plain');
 		$contentType = strtolower(trim(explode(';', $this->contentType, 2)[0]));

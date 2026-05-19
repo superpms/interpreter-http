@@ -8,6 +8,7 @@ use pms\app\HttpMiddlewareApp;
 use pms\Container;
 use pms\facade\BootOptions;
 use pms\facade\Config;
+use pms\facade\Ctx;
 use pms\hook\HttpLifecycleHook;
 use pms\HttpExceptionHandle;
 use pms\inject\HttpRequestInject;
@@ -84,6 +85,7 @@ class Sandbox extends Container
                     return true;
                 }
                 $this->request->init();
+                Ctx::set(HttpRequestInject::class, $this->request);
             }
 
             $this->route->activate($this->request, $this->response);

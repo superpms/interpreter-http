@@ -5,8 +5,10 @@ namespace pms\interpreter\http;
 use pms\app\InterpreterApp;
 use pms\broadcast\SystemErrorBroadcast;
 use pms\facade\BootOptions;
+use pms\facade\Ctx;
 use pms\facade\Path;
 use pms\hook\HttpLifecycleHook;
+use pms\inject\HttpRequestInject;
 use pms\interpreter\http\sandbox\HttpRequest;
 use pms\interpreter\http\sandbox\HttpResponse;
 
@@ -17,6 +19,7 @@ class Interpreter extends InterpreterApp
 
     public static function entry(): bool
     {
+        Ctx::set(HttpRequestInject::class, null);
         $request = new HttpRequest();
         $response = new HttpResponse();
         SystemErrorBroadcast::listener(function () use ($response) {
