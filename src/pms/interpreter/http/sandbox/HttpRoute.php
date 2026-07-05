@@ -160,6 +160,18 @@ class HttpRoute extends OptionsAccess implements HttpRouteInject
             return;
         }
         HttpRouter::load($this->app);
+        $dynamic = HttpRouter::findDynamic($this->pathinfo,[
+            'app' => $this->app,
+            'terminal' => $this->terminal,
+        ]);
+        if($dynamic !== null){
+            $this->pathinfo = $dynamic['path'];
+            $this->interface = config('http.app.default.interface', 'Index');
+            $this->analysisPathInfo();
+            if(!empty($dynamic['params'])){
+                $this->request->mergeGet($dynamic['params']);
+            }
+        }
 		$this->interfaceClass = HttpRouter::findClass($this->pathinfo,[
             'app' => $this->app,
             'terminal' => $this->terminal,

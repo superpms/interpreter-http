@@ -40,6 +40,12 @@ class Driver
     protected array $container = [];
 
     /**
+     * 动态路由容器，存储路径前缀与参数名的映射关系
+     * @var array
+     */
+    protected array $dynamicContainer = [];
+
+    /**
      * 路由别名容器，存储终端原名与别名映射关系
      */
     protected array $terminalAliasContainer = [];
@@ -79,6 +85,18 @@ class Driver
         foreach ($paths as $path) {
             $this->pusher($path, $class);
         }
+        return $this;
+    }
+
+    /**
+     * 添加动态路由映射关系
+     * @param string $path 路由路径前缀
+     * @param string ...$args 动态参数名
+     * @return static
+     */
+    public function dynamic(string $path, string ...$args): static
+    {
+        $this->dynamicContainer[$path] = $args;
         return $this;
     }
 
@@ -168,6 +186,81 @@ class Driver
         return $this->container[$path] ?? null;
     }
 
+    /**
+     * 查找匹配当前路径的动态路由
+     * @param string $path 路由路径
+     * @param array $option 路由参数
+     * @return array|null
+     */
+    protected function _findDynamic(string $path, array $option = []): ?array
+    {
+        $matched = null;
+        $matchedLength = -1;
+        foreach ($this->dynamicContainer as $router => $arguments) {
+            foreach ($option as $key => $value) {
+                $templateFieldKey = strtoupper('TEMPLATE_' . $key);
+                $template = $this->{$templateFieldKey};
+                $router = str_replace($template, $value, $router);
+            }
+            $router = rtrim($router, '/');
+            if ($router === '') {
+                $router = '/';
+            }
+            if ($path !== $router && !str_starts_with($path, $router . '/')) {
+                continue;
+            }
+            $currentLength = strlen($router);
+            if ($currentLength <= $matchedLength) {
+                continue;
+            }
+            $matchedLength = $currentLength;
+            $matched = [
+                'path' => $router,
+                'params' => $this->parseDynamicParams(substr($path, $currentLength), $arguments),
+            ];
+        }
+        return $matched;
+    }
+
+    /**
+     * 解析动态路由参数
+     * @param string $path 动态路径片段
+     * @param array $arguments 参数名
+     * @return array
+     */
+    protected function parseDynamicParams(string $path, array $arguments): array
+    {
+        if (empty($arguments)) {
+            return [];
+        }
+        $path = ltrim($path, '/');
+        if ($path === '') {
+            return [];
+        }
+        if (count($arguments) === 1) {
+            return [$arguments[0] => $path];
+        }
+        $segments = array_values(array_filter(explode('/', $path), function ($value) {
+            return $value !== '';
+        }));
+        $params = [];
+        $lastIndex = count($arguments) - 1;
+        foreach ($arguments as $index => $name) {
+            if ($index === $lastIndex) {
+                $value = implode('/', array_slice($segments, $index));
+                if ($value !== '') {
+                    $params[$name] = $value;
+                }
+                break;
+            }
+            if (!isset($segments[$index])) {
+                break;
+            }
+            $params[$name] = $segments[$index];
+        }
+        return $params;
+    }
+
     // 隐藏框架内部方法
     public function __call(string $name, array $arguments)
     {
@@ -179,6 +272,8 @@ class Driver
                 return $this->_findClass(...$arguments);
             case 'findTerminalAlias':
                 return $this->_findTerminalAlias(...$arguments);
+            case 'findDynamic':
+                return $this->_findDynamic(...$arguments);
         }
     }
 

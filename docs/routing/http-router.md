@@ -43,6 +43,25 @@ HttpRouter::provider(\app\demo\tenant\http\Index::class, [
 
 `provider($class, $paths)` is a convenience wrapper around `pusher()`.
 
+## Register Dynamic Route
+
+```php
+HttpRouter::dynamic('/platform/system/kits/Router', 'kitName', 'path');
+```
+
+`dynamic($path, ...$args)` maps a path prefix to one fixed request path and converts the remaining path into GET parameters.
+
+For `/platform/system/kits/Router/payment-wechat/Get/GetUserInfo/Item`, the fixed request path is `/platform/system/kits/Router`, and GET parameters become:
+
+```text
+kitName=payment-wechat
+path=Get/GetUserInfo/Item
+```
+
+Parameter splitting follows the parameter count from left to right. When there is one parameter name, the whole remaining path is assigned to it. When there are multiple parameter names, earlier names receive one path segment each, and the last name receives the remaining path.
+
+Dynamic GET parameters have higher priority than query string parameters with the same name.
+
 ## Templates
 
 The driver has two built-in templates:
@@ -81,4 +100,4 @@ Use terminal aliases to reuse a terminal implementation without duplicating HTTP
 
 ## Hidden Driver Methods
 
-`load`, `findClass`, and `findTerminalAlias` are routed through `Driver::__call()`. They are intentionally not public concrete methods on the class, but they are available through the facade and internal route resolver.
+`load`, `findClass`, `findDynamic`, and `findTerminalAlias` are routed through `Driver::__call()`. They are intentionally not public concrete methods on the class, but they are available through the facade and internal route resolver.

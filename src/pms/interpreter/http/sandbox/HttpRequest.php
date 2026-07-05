@@ -80,6 +80,17 @@ class HttpRequest implements HttpRequestInject
 		}
 		return $this->get[$name] ?? $default;
 	}
+
+	/**
+	 * 合并 GET 参数并刷新请求参数集合
+	 * @param array $data
+	 * @return void
+	 */
+	public function mergeGet(array $data): void
+	{
+		$this->get = array_merge($this->get, $data);
+		$this->params = array_merge($this->get, $this->post, $this->files);
+	}
 	
 	public function input(): string
 	{

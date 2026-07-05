@@ -16,6 +16,7 @@ interface HttpRequestInject {
 
     public function post(?string $name = null, mixed $default = null): mixed;
     public function get(?string $name = null, mixed $default = null): mixed;
+    public function mergeGet(array $data): void;
     public function input(): string;
     public function contentType(): string;
     public function ip(): string;
