@@ -20,7 +20,7 @@ class HttpRouteCoroutine
     {
         $name = static::class . "__result__";
         $resultRaw = Ctx::get($name,[]);
-        if(!$class === null){
+        if($class !== null){
             return $resultRaw[$class] ?? null;
         }
         return $resultRaw;
