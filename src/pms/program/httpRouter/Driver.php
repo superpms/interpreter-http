@@ -100,6 +100,20 @@ class Driver
         return $this;
     }
 
+    /**
+     * 添加动态路由并绑定处理类
+     * @param string $path 路由路径前缀
+     * @param string $class 处理类名
+     * @param string ...$args 动态参数名
+     * @return static
+     */
+    public function dynamicPusher(string $path, string $class, string ...$args): static
+    {
+        $this->dynamic($path, ...$args);
+        $this->pusher($path, $class);
+        return $this;
+    }
+
 
     /**
      * 加载应用的路由配置文件
