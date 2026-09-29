@@ -54,7 +54,10 @@ class HttpRoute extends OptionsAccess implements HttpRouteInject
     {
         $this->request = $request;
         $this->response = $response;
-        $this->constructInterface();
+        $params = $this->constructInterface();
+        if ($params !== []) {
+            $this->request->mergeGet($params);
+        }
     }
 
     /**
@@ -154,45 +157,65 @@ class HttpRoute extends OptionsAccess implements HttpRouteInject
         return $customizedHandle;
     }
 
-    protected function constructInterface(): void
+    /**
+     * 按精确映射、目录接口、动态前缀的顺序定位接口，返回路径参数。
+     * 本方法只解析路由，供 HTTP 激活流程与接口元数据共用。
+     *
+     * @return array<string, string> 动态路径参数
+     */
+    public function constructInterface(): array
     {
-        if($this->isForward){
-            return;
+        if ($this->isForward) {
+            return [];
         }
+
         HttpRouter::load($this->app);
-        $dynamic = HttpRouter::findDynamic($this->pathinfo,[
+        $this->interfaceClass = $this->findInterfaceClass();
+        if ($this->interfaceClass !== null) {
+            return [];
+        }
+
+        $dynamic = HttpRouter::findDynamic($this->pathinfo, [
             'app' => $this->app,
             'terminal' => $this->terminal,
         ]);
-        if($dynamic !== null){
-            $this->pathinfo = $dynamic['path'];
-            $this->interface = config('http.app.default.interface', 'Index');
-            $this->analysisPathInfo();
-            if(!empty($dynamic['params'])){
-                $this->request->mergeGet($dynamic['params']);
+        if ($dynamic === null) {
+            $this->interfaceClass = $this->generateInterfaceNamespace($this->app, $this->terminal, $this->interface);
+            return [];
+        }
+
+        $this->pathinfo = $dynamic['path'];
+        $this->interface = config('http.app.default.interface', 'Index');
+        $this->analysisPathInfo();
+        $this->interfaceClass = $this->findInterfaceClass()
+            ?? $this->generateInterfaceNamespace($this->app, $this->terminal, $this->interface);
+        return $dynamic['params'];
+    }
+
+    /**
+     * 查找当前完整路径的显式映射与实际存在的目录类。
+     * 显式映射选定后，由执行层检查目标类与接口准入。
+     *
+     * @return string|null 接口类名；没有匹配时返回 null
+     */
+    protected function findInterfaceClass(): ?string
+    {
+        $option = ['app' => $this->app, 'terminal' => $this->terminal];
+        $class = HttpRouter::findClass($this->pathinfo, $option);
+        if ($class !== null) {
+            return $class;
+        }
+
+        $terminals = HttpRouter::findTerminalAlias($this->app, $this->terminal, $option) ?? [];
+        foreach ($terminals as $terminal) {
+            $class = $this->generateInterfaceNamespace($this->app, $terminal, $this->interface);
+            if (class_exists($class)) {
+                return $class;
             }
         }
-		$this->interfaceClass = HttpRouter::findClass($this->pathinfo,[
-            'app' => $this->app,
-            'terminal' => $this->terminal,
-        ]);
-        if($this->interfaceClass === null){
-			$namespaceTerminal = HttpRouter::findTerminalAlias($this->app,$this->terminal,[
-				'app' => $this->app,
-				'terminal' => $this->terminal,
-			]);
-			if(!empty($namespaceTerminal)){
-				foreach ($namespaceTerminal as $terminal){
-					$namespace = $this->generateInterfaceNamespace($this->app, $terminal, $this->interface);
-					if(class_exists($namespace)){
-						$this->interfaceClass = $namespace;
-						return;
-					}
-				}
-			}
-			$namespace = $this->generateInterfaceNamespace($this->app, $this->terminal, $this->interface);
-			$this->interfaceClass = $namespace;
-        }
+
+        $class = $this->generateInterfaceNamespace($this->app, $this->terminal, $this->interface);
+        return class_exists($class) ? $class : null;
     }
 
 
@@ -218,12 +241,6 @@ class HttpRoute extends OptionsAccess implements HttpRouteInject
     }
 
 
-    public function __call(string $name, array $arguments){
-        switch ($name){
-            case 'constructInterface':
-                $this->_constructInterface();
-        }
-    }
 
 
     protected ?HttpRouteCoroutine $ForwardCoroutine = null;
