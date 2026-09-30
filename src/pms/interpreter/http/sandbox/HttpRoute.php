@@ -260,17 +260,29 @@ class HttpRoute extends OptionsAccess implements HttpRouteInject
     /**
      * 路由转发
      * @param string $forwardClass 转发目标类名
+     * @param array|null $params 独立转发参数；null 时共享当前请求
+     * @param string|null $method 转发请求方法
+     * @param string|null $pathinfo 转发目标路径
      * @return HttpRouteCoroutine
+     * @throws \Throwable 转发异常交由调用入口处理
      */
-    public function forward(string $forwardClass): HttpRouteCoroutine
+    public function forward(
+        string $forwardClass,
+        ?array $params = null,
+        ?string $method = null,
+        ?string $pathinfo = null,
+    ): HttpRouteCoroutine
     {
         if($this->request === null || $this->response === null){
             throw new SystemException('当前路由未激活,无法使用路由转发');
         }
+        $request = $params === null && $method === null && $pathinfo === null
+            ? $this->request
+            : $this->request->withParams($params ?? $this->request->params(), $method, $pathinfo);
         $forwardCoroutine = $this->getCoroutine();
         $forwardCoroutine->pushResult(
             $forwardClass,
-            (new Sandbox($this->request, $this->response))->run($forwardClass)
+            (new Sandbox($request, $this->response))->run($forwardClass)
         );
         return $forwardCoroutine;
     }

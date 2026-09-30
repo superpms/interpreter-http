@@ -92,6 +92,24 @@ class HttpRequest implements HttpRequestInject
 		$this->params = array_merge($this->get, $this->post, $this->files);
 	}
 	
+	/**
+	 * 复制当前请求并替换转发数据，保持外层请求及认证上下文。
+	 */
+	public function withParams(array $params, ?string $method = null, ?string $pathinfo = null): static
+	{
+		$request = clone $this;
+		$request->method = strtoupper($method ?? $this->method);
+		$request->pathinfo = $pathinfo ?? $this->pathinfo;
+		$request->get = $request->method === 'GET' ? $params : [];
+		$request->post = $request->method === 'GET' ? [] : $params;
+		$request->files = [];
+		$request->params = $params;
+		$request->input = json_encode($params, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES | JSON_THROW_ON_ERROR);
+		$request->inputLoaded = true;
+		$request->contentType = JSON_CONTENT_TYPE;
+		return $request;
+	}
+
 	public function input(): string
 	{
 		$content = $this->getContent();

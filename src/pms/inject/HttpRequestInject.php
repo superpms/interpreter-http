@@ -17,6 +17,9 @@ interface HttpRequestInject {
     public function post(?string $name = null, mixed $default = null): mixed;
     public function get(?string $name = null, mixed $default = null): mixed;
     public function mergeGet(array $data): void;
+
+    /** 复制当前请求，替换转发参数及指定的方法、路径，保留已建立的请求上下文。 */
+    public function withParams(array $params, ?string $method = null, ?string $pathinfo = null): static;
     public function input(): string;
     public function contentType(): string;
     public function ip(): string;
