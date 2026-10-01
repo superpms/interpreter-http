@@ -14,12 +14,19 @@ use pms\program\httpRoute\HttpRouteCoroutine;
  * @property string $interfaceClass
  * @property string $model
  * @property bool   $isStm
+ * @property bool   $inPrefix 外部请求前缀准入状态
  * @property bool   $inStatic
  * @property bool   $inApp
  * @property bool   $inTerminal
  */
 interface HttpRouteInject
 {
+
+    /**
+     * 获取接口所属的 HTTP 配置目录。
+     * @return list<string> 配置目录
+     */
+    public function configPaths(): array;
 
     /**
      * 路由转发

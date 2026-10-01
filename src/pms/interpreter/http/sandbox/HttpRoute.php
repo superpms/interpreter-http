@@ -4,7 +4,9 @@ namespace pms\interpreter\http\sandbox;
 
 use pms\exception\SystemException;
 use pms\facade\BootOptions;
+use pms\facade\Path;
 use pms\facade\HttpRouter;
+use pms\hook\HttpEntrypointHook;
 use pms\HttpExceptionHandle;
 use pms\inject\HttpRequestInject;
 use pms\inject\HttpResponseInject;
@@ -37,11 +39,67 @@ class HttpRoute extends OptionsAccess implements HttpRouteInject
         $this->terminalMode = config('http.app.mode', HTTP_APP_MODE_SINGLE);
         $this->interface = config('http.app.default.interface', 'Index');
         $this->model = config('http.app.route.mode',HTTP_ROUTE_MODE_APP);
+        $defaults = [$this->app, $this->terminal, $this->interface];
         $this->analysisPathInfo();
-        $this->useTerminalMode();
         $this->calcInStatic();
+        $this->inPrefix = true;
+        if (!$this->inStatic) {
+            $prefix = HttpEntrypointHook::normalizePrefix(config('http.app.route.prefix', ''));
+            $relative = HttpEntrypointHook::relativePath($pathinfo, $prefix);
+            if ($relative === null) {
+                $this->inPrefix = $this->isForward;
+            } else {
+                $this->pathinfo = $relative;
+                [$this->app, $this->terminal, $this->interface] = $defaults;
+                $this->analysisPathInfo();
+            }
+        }
+        $this->useTerminalMode();
         $this->calcInApp();
         $this->calcInTerminal();
+    }
+
+    /**
+     * 根据统一挂载表创建 HTTP 路由，供运行时和接口元数据共用。
+     * @param string $pathinfo 完整请求路径
+     * @param string|null $forward 已指定的接口类
+     * @return HttpRoute 当前挂载点的 HTTP 路由
+     */
+    public static function resolve(string $pathinfo, ?string $forward = null): HttpRoute
+    {
+        $handler = HttpEntrypointHook::match($pathinfo);
+        $routeClass = $handler !== null && is_subclass_of($handler, self::class)
+            ? $handler
+            : self::class;
+        return new $routeClass($pathinfo, $forward);
+    }
+
+    /**
+     * 使用统一 HTTP 执行流程处理路由挂载。
+     * @param HttpRequestInject $request 请求
+     * @param HttpResponseInject $response 响应
+     * @return void
+     */
+    public static function handle(HttpRequestInject $request, HttpResponseInject $response): void
+    {
+        (new Sandbox($request, $response))->run();
+    }
+
+    /**
+     * 获取当前接口的 HTTP 配置目录。
+     * @return list<string> 全局配置、应用配置和接口所属配置目录
+     */
+    public function configPaths(): array
+    {
+        $interpreter = config('http.app.structure.package', 'http');
+        $config = config('http.app.structure.config', 'config');
+        return [
+            Path::getConfig('interpreter', $interpreter),
+            Path::getConfig('interpreter', $interpreter, 'app', $this->app),
+            $this->isStm
+                ? Path::getApp($this->app, $config)
+                : Path::getApp($this->app, $this->terminal, $config),
+        ];
     }
 
     /**
@@ -56,7 +114,7 @@ class HttpRoute extends OptionsAccess implements HttpRouteInject
         $this->response = $response;
         $params = $this->constructInterface();
         if ($params !== []) {
-            $this->request->mergeGet($params);
+            $this->request->mergeRouteParams($params);
         }
     }
 
@@ -66,6 +124,26 @@ class HttpRoute extends OptionsAccess implements HttpRouteInject
      */
     public function exception(){
 
+    }
+
+    /**
+     * 生成带配置前缀的外部业务请求路径。
+     *
+     * @param string $pathinfo 业务路由路径；已带前缀时保持原值
+     * @return string 外部请求路径
+     */
+    public static function withPrefix(string $pathinfo): string
+    {
+        $prefix = HttpEntrypointHook::normalizePrefix(config('http.app.route.prefix', ''));
+        $pathinfo = '/' . ltrim($pathinfo, '/');
+        $handler = HttpEntrypointHook::match($pathinfo);
+        if ($handler !== null && is_subclass_of($handler, self::class)) {
+            return $pathinfo;
+        }
+        if (HttpEntrypointHook::relativePath($pathinfo, $prefix) !== null) {
+            return $pathinfo;
+        }
+        return $prefix . $pathinfo;
     }
 
     protected function analysisPathInfo(): void{
@@ -165,7 +243,7 @@ class HttpRoute extends OptionsAccess implements HttpRouteInject
      */
     public function constructInterface(): array
     {
-        if ($this->isForward) {
+        if ($this->isForward || !$this->inPrefix) {
             return [];
         }
 
@@ -275,6 +353,9 @@ class HttpRoute extends OptionsAccess implements HttpRouteInject
     {
         if($this->request === null || $this->response === null){
             throw new SystemException('当前路由未激活,无法使用路由转发');
+        }
+        if ($pathinfo !== null) {
+            $pathinfo = self::withPrefix($pathinfo);
         }
         $request = $params === null && $method === null && $pathinfo === null
             ? $this->request

@@ -92,6 +92,15 @@ class HttpRequest implements HttpRequestInject
 		$this->params = array_merge($this->get, $this->post, $this->files);
 	}
 	
+	/** 注入可信路径参数，保持原始 JSON-RPC 请求体。 */
+	public function mergeRouteParams(array $data): void
+	{
+		$this->get = array_replace($this->get, $data);
+		$this->post = array_replace($this->post, array_intersect_key($data, $this->post));
+		$this->files = array_diff_key($this->files, $data);
+		$this->params = array_replace($this->params, $data);
+	}
+
 	/**
 	 * 复制当前请求并替换转发数据，保持外层请求及认证上下文。
 	 */
@@ -179,7 +188,14 @@ class HttpRequest implements HttpRequestInject
 		return $this->scheme() . '://' . $this->host();
 	}
 	
-	public function builder(string|array $path = ""): string
+	/**
+	 * 使用当前域名生成请求地址。
+	 *
+	 * @param string|array $path 请求路径，数组按路径段拼接
+	 * @param bool $withPrefix 是否添加配置的业务前缀；静态地址传入 false
+	 * @return string 完整请求地址
+	 */
+	public function builder(string|array $path = "", bool $withPrefix = true): string
 	{
 		if (is_string($path)) {
 			$path = [$path];
@@ -187,8 +203,8 @@ class HttpRequest implements HttpRequestInject
 		$path = implode('/', $path);
 		$path = str_replace('\\', '/', $path);
 		$path = str_replace('//', '/', $path);
-		$path = ltrim($path, "/");
-		return $this->domain() . "/" . $path;
+		$path = '/' . ltrim($path, "/");
+		return $this->domain() . ($withPrefix ? HttpRoute::withPrefix($path) : $path);
 	}
 	
 	public function pathinfo(): string

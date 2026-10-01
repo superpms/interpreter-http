@@ -4,6 +4,11 @@ namespace pms\inject;
 
 interface HttpRequestInject {
 
+    public function init(): void;
+
+    /** 注入可信路径参数，保留原始请求体，同名输入以路径参数为准。 */
+    public function mergeRouteParams(array $data): void;
+
     public function server(?string $name = null, mixed $default = null): mixed;
 
     public function header(?string $name = null, mixed $default = null): mixed;
@@ -26,7 +31,8 @@ interface HttpRequestInject {
     public function scheme(): string;
     public function host(): string;
 	public function domain(): string;
-	public function builder(string|array $path=""): string;
+	/** 生成完整请求地址，默认添加业务前缀；静态地址传入 $withPrefix = false。 */
+	public function builder(string|array $path="", bool $withPrefix = true): string;
 	public function pathinfo(): string;
 	public function getContent(): string|false;
 	public function rawContent(): string|false;

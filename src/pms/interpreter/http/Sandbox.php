@@ -57,9 +57,14 @@ class Sandbox extends Container
                 set_error_handler('HttpCustomErrorHandler');
             }
 
-            $this->route = new HttpRoute($this->request->pathinfo(),$forward);
+            $this->route = HttpRoute::resolve($this->request->pathinfo(), $forward);
 
             if (!$this->isForward) {
+                if (!$this->route->inPrefix) {
+                    $this->response->status(404, 'Not Found');
+                    $this->response->end('Not Found');
+                    return true;
+                }
                 if ($this->request->isOptions()) {
                     $this->response->end();
                     return true;
@@ -101,7 +106,7 @@ class Sandbox extends Container
             if ($error === null || $error['type'] !== E_WARNING) {
                 if ($this->response->isWritable()) {
                     $this->response->header('Content-Type', $this->contentType);
-                    $this->exceptionHandle($e);
+                    $this->exceptionHandle($e, isset($this->route));
                 }
             }
             return false;
@@ -156,38 +161,7 @@ class Sandbox extends Container
 
     protected function initInterpreterConfig(): void
     {
-        $interpreterName = config('http.app.structure.package', 'http');
-        $configName = config('http.app.structure.config', 'config');
-
-        $interpreterConfigPath = Path::getConfig(
-            'interpreter',
-            $interpreterName
-        );
-
-        $interpreterAppConfigPath = Path::getConfig(
-            'interpreter',
-            $interpreterName,
-            'app',
-            $this->route->app,
-        );
-
-        if ($this->route->isStm) {
-            $appConfigPath = Path::getApp(
-                $this->route->app,
-                $configName
-            );
-        } else {
-            $appConfigPath = Path::getApp(
-                $this->route->app,
-                $this->route->terminal,
-                $configName
-            );
-        }
-        Config::fetchConfig([
-            $interpreterConfigPath,
-            $interpreterAppConfigPath,
-            $appConfigPath
-        ], true);
+        Config::fetchConfig($this->route->configPaths(), true);
     }
 
 

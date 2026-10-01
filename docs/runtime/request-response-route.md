@@ -28,6 +28,8 @@ Important methods:
 
 `init()` resolves HTTPS and IP from configured trusted headers, derives host and scheme, parses JSON body into `post` when the content type is `application/json`, and builds `params` from GET, POST, and files.
 
+`builder(string|array $path = "", bool $withPrefix = true): string` 使用当前请求的域名生成完整地址。字符串路径和数组路径段沿用现有拼接规则；默认调用 `HttpRoute::withPrefix()` 添加 `http.app.route.prefix`，已有前缀保持一份，空配置保持原业务路径。静态资源地址使用 `builder('/default.jpg', false)`，直接拼接域名和静态路径。套件 GetAssets 通过 HTTP 接口提供资源，使用默认业务前缀，并保留文件路径末尾的 `/`。
+
 ## HttpResponse
 
 Concrete class: `pms\interpreter\http\sandbox\HttpResponse`

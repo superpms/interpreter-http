@@ -25,5 +25,13 @@
     },
     "require-dev": {
         "superpms/interpreter-terminal": "^1.0.0"
+    },
+    "extra": {
+        "pms": {
+            "config": {
+                "http": "resource/config.php",
+                "interpreter/http/middleware": "resource/middleware.php"
+            }
+        }
     }
 }
