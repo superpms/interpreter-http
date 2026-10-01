@@ -192,19 +192,12 @@ class HttpRequest implements HttpRequestInject
 	 * 使用当前域名生成请求地址。
 	 *
 	 * @param string|array $path 请求路径，数组按路径段拼接
-	 * @param bool $withPrefix 是否添加配置的业务前缀；静态地址传入 false
+	 * @param bool|string $prefix true 使用业务前缀，false 使用根路径，字符串指定挂载前缀
 	 * @return string 完整请求地址
 	 */
-	public function builder(string|array $path = "", bool $withPrefix = true): string
+	public function builder(string|array $path = "", bool|string $prefix = true): string
 	{
-		if (is_string($path)) {
-			$path = [$path];
-		}
-		$path = implode('/', $path);
-		$path = str_replace('\\', '/', $path);
-		$path = str_replace('//', '/', $path);
-		$path = '/' . ltrim($path, "/");
-		return $this->domain() . ($withPrefix ? HttpRoute::withPrefix($path) : $path);
+		return $this->domain() . HttpRoute::builder($path, $prefix);
 	}
 	
 	public function pathinfo(): string

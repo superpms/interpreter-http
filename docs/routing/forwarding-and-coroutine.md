@@ -10,7 +10,7 @@ $coroutine = $this->route->forward(\app\demo\http\Other::class);
 
 `HttpRoute::forward($forwardClass)` requires the route to be activated. If the route has no request or response object, it throws `SystemException`.
 
-`forward($class, $params, $method, $pathinfo)` supports independent parameters and an explicit request method and path. An explicit path passes through `HttpRoute::withPrefix()` once, so callers can continue passing internal paths. Already-prefixed paths retain one prefix. The target route removes the prefix before app and terminal parsing; the copied request retains the prefixed path for middleware and interface access.
+`forward($class, $params, $method, $pathinfo)` supports independent parameters and an explicit request method and path. An explicit path passes through `HttpRoute::builder()` once, so callers can continue passing internal paths. Already-prefixed paths retain one prefix. The target route removes the prefix before app and terminal parsing; the copied request retains the prefixed path for middleware and interface access.
 
 Calling with only a class shares the existing request. Supplying parameters, method, or path clones the native request through `withParams()`, preserving its authenticated attach context and leaving the outer request unchanged. The new Sandbox reuses the response.
 

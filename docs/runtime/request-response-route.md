@@ -28,7 +28,7 @@ Important methods:
 
 `init()` resolves HTTPS and IP from configured trusted headers, derives host and scheme, parses JSON body into `post` when the content type is `application/json`, and builds `params` from GET, POST, and files.
 
-`builder(string|array $path = "", bool $withPrefix = true): string` 使用当前请求的域名生成完整地址。字符串路径和数组路径段沿用现有拼接规则；默认调用 `HttpRoute::withPrefix()` 添加 `http.app.route.prefix`，已有前缀保持一份，空配置保持原业务路径。静态资源地址使用 `builder('/default.jpg', false)`，直接拼接域名和静态路径。套件 GetAssets 通过 HTTP 接口提供资源，使用默认业务前缀，并保留文件路径末尾的 `/`。
+`builder(string|array $path = "", bool|string $prefix = true): string` 使用当前请求域名与 `HttpRoute::builder($path, $prefix)` 生成完整地址。公共 builder 统一处理字符串、数组路径段、反斜线及挂载前缀。prefix=true 使用 http.app.route.prefix，并保留已匹配 HTTP 挂载点的完整路径；false 使用站点根路径；字符串指定当前目标挂载前缀。套件地址传入 config('kits.http.prefix', 'kits')。已有前缀保持一份；资源路径末尾的 `/` 保持。GetAssets 使用默认业务前缀，静态资源使用 builder('/default.jpg', false)。
 
 ## HttpResponse
 

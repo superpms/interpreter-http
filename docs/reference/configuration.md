@@ -19,7 +19,7 @@ This package reads configuration through the global `config()` helper. The main 
 
 业务前缀按完整路径段校验，并在应用路由拆分前剥离一次。显式映射、动态前缀和应用路由文件使用应用内部路径。外部业务请求缺少配置前缀时返回 HTTP 404，OPTIONS 请求同样遵守前缀准入。原路径命中的静态资源保持原地址。
 
-`HttpRoute::withPrefix($path)` 统一生成外部业务路径，已带当前前缀的路径保持原值。`forward()` 自动为显式指定的转发路径补齐前缀；共享请求保持原请求，内部指定类的转发保留原有应用、终端、参数和认证执行链。
+`HttpRoute::builder($path, $prefix = true)` 统一生成外部路径；true 使用业务前缀，false 使用根路径，字符串指定挂载前缀。套件调用方传入 kits.http.prefix；已带目标前缀的路径保持一份。`forward()` 自动为显式指定的转发路径补齐前缀；共享请求保持原请求，内部指定类的转发保留原有应用、终端、参数和认证执行链。
 
 ## App Structure
 

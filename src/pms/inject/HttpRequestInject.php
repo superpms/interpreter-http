@@ -31,8 +31,8 @@ interface HttpRequestInject {
     public function scheme(): string;
     public function host(): string;
 	public function domain(): string;
-	/** 生成完整请求地址，默认添加业务前缀；静态地址传入 $withPrefix = false。 */
-	public function builder(string|array $path="", bool $withPrefix = true): string;
+	/** 生成完整请求地址；true 使用业务前缀，false 使用根路径，字符串指定挂载前缀。 */
+	public function builder(string|array $path="", bool|string $prefix = true): string;
 	public function pathinfo(): string;
 	public function getContent(): string|false;
 	public function rawContent(): string|false;

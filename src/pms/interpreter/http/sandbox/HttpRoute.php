@@ -127,23 +127,31 @@ class HttpRoute extends OptionsAccess implements HttpRouteInject
     }
 
     /**
-     * 生成带配置前缀的外部业务请求路径。
+     * 构建外部路由路径。
      *
-     * @param string $pathinfo 业务路由路径；已带前缀时保持原值
+     * @param string|array $path 请求路径，数组按路径段拼接
+     * @param bool|string $prefix true 使用业务前缀，false 使用根路径，字符串指定挂载前缀
      * @return string 外部请求路径
      */
-    public static function withPrefix(string $pathinfo): string
+    public static function builder(string|array $path = '', bool|string $prefix = true): string
     {
-        $prefix = HttpEntrypointHook::normalizePrefix(config('http.app.route.prefix', ''));
-        $pathinfo = '/' . ltrim($pathinfo, '/');
-        $handler = HttpEntrypointHook::match($pathinfo);
-        if ($handler !== null && is_subclass_of($handler, self::class)) {
-            return $pathinfo;
+        $path = is_array($path) ? implode('/', $path) : $path;
+        $path = str_replace('\\', '/', $path);
+        $path = '/' . ltrim(str_replace('//', '/', $path), '/');
+        if ($prefix === false) {
+            return $path;
         }
-        if (HttpEntrypointHook::relativePath($pathinfo, $prefix) !== null) {
-            return $pathinfo;
+        if ($prefix === true) {
+            $handler = HttpEntrypointHook::match($path);
+            if ($handler !== null && is_subclass_of($handler, self::class)) {
+                return $path;
+            }
+            $prefix = config('http.app.route.prefix', '');
         }
-        return $prefix . $pathinfo;
+        $prefix = HttpEntrypointHook::normalizePrefix($prefix);
+        return HttpEntrypointHook::relativePath($path, $prefix) === null
+            ? $prefix . $path
+            : $path;
     }
 
     protected function analysisPathInfo(): void{
@@ -355,7 +363,7 @@ class HttpRoute extends OptionsAccess implements HttpRouteInject
             throw new SystemException('当前路由未激活,无法使用路由转发');
         }
         if ($pathinfo !== null) {
-            $pathinfo = self::withPrefix($pathinfo);
+            $pathinfo = self::builder($pathinfo);
         }
         $request = $params === null && $method === null && $pathinfo === null
             ? $this->request
